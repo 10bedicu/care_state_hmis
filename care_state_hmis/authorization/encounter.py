@@ -3,19 +3,14 @@ from care.security.authorization.base import (
     AuthorizationController,
     AuthorizationHandler,
 )
+from care.security.authorization.encounter import EncounterAccess
 from care.security.permissions.encounter import EncounterPermissions
 
 
-class EncounterAccess(AuthorizationHandler):
+class HMISEncounterAccess(AuthorizationHandler):
     def check_permission_in_encounter(self, user, encounter, permission):
-        orgs = [*encounter.facility_organization_cache]
-        if encounter.current_location:
-            orgs.extend(encounter.current_location.facility_organization_cache)
-        return self.check_permission_in_facility_organization(
-            [permission],
-            user,
-            orgs=orgs,
-        )
+        encounter_access = EncounterAccess()
+        return encounter_access.check_permission_in_encounter(user, encounter, permission)
 
     def can_restart_encounter_obj(self, user, encounter):
         """
@@ -32,4 +27,4 @@ class EncounterAccess(AuthorizationHandler):
         )
 
 
-AuthorizationController.override_authz_controllers.append(EncounterAccess)
+AuthorizationController.override_authz_controllers.append(HMISEncounterAccess)
