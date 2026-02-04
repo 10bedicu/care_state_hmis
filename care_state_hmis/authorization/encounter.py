@@ -19,7 +19,7 @@ class HMISEncounterAccess(AuthorizationHandler):
         if user.is_superuser:
             return True
         # Only the user who updated the encounter can restart it
-        if encounter.updated_by != user:
+        if encounter.updated_by_id != user.id:
             return False
         # Cannot write to a closed encounter
         if encounter.status not in COMPLETED_CHOICES:
