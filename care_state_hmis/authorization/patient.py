@@ -15,7 +15,7 @@ class HMISPatientAccess(AuthorizationHandler):
 
     def can_view_patient_obj(self, user, patient):
         if self.check_permission_in_organization(
-            [PatientPermissions.can_create_patient.name], user
+            [PatientPermissions.can_list_patients.name], user
         ):
             return True
         user_roles = self.find_roles_on_patient(user, patient)
@@ -26,7 +26,7 @@ class HMISPatientAccess(AuthorizationHandler):
 
     def can_write_patient_obj(self, user, patient):
         if self.check_permission_in_organization(
-            [PatientPermissions.can_create_patient.name], user
+            [PatientPermissions.can_write_patient.name], user
         ):
             return True
         user_roles = self.find_roles_on_patient(user, patient)
