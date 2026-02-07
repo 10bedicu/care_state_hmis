@@ -12,8 +12,10 @@ from care.utils.lock import Lock
 
 
 @receiver(post_save, sender=TokenBooking)
-def handle_token_on_appointment_scheduled(sender, instance, **kwargs):
-    if instance.token:
+def handle_token_on_appointment_scheduled(
+    sender, instance: TokenBooking, created: bool, **kwargs
+):
+    if not created or instance.token:
         return
 
     # get the default token category for the resource_type
