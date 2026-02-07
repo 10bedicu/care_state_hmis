@@ -28,9 +28,14 @@ from care.utils.time_util import care_now
 
 
 @receiver(post_save, sender=TokenBooking)
-def handle_payment_on_appointment_scheduled(sender, instance, **kwargs):
+def handle_payment_on_appointment_scheduled(
+    sender, instance: TokenBooking, created: bool, **kwargs
+):
+    if not created or instance.charge_item:
+        return
+
     charge_item = instance.charge_item
-    if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
+    if charge_item.status == ChargeItemStatusOptions.billable.value:
         # create invoice
         try:
             with InvoiceCreateLock():
@@ -92,7 +97,7 @@ def handle_payment_on_appointment_scheduled(sender, instance, **kwargs):
 
 
 @receiver(pre_save, sender=Invoice)
-def handle_payment_on_invoice_issued(sender, instance, **kwargs):
+def handle_payment_on_invoice_issued(sender, instance: Invoice, **kwargs):
     if not instance.pk:
         return
 
