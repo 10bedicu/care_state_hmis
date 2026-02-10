@@ -31,10 +31,10 @@ from care.utils.time_util import care_now
 def handle_payment_on_appointment_scheduled(
     sender, instance: TokenBooking, created: bool, **kwargs
 ):
-    if not created or instance.charge_item:
+    charge_item = instance.charge_item
+    if not created or not charge_item:
         return
 
-    charge_item = instance.charge_item
     if charge_item.status == ChargeItemStatusOptions.billable.value:
         # create invoice
         try:
