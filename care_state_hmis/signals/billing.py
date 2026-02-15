@@ -2,6 +2,8 @@ from django.db import transaction
 from django.db.models import Case, Sum, When
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from care.emr.models.encounter import Encounter
+from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
 from rest_framework.exceptions import ValidationError
 
 from care.emr.locks.billing import InvoiceCreateLock, InvoiceLock
@@ -9,10 +11,14 @@ from care.emr.models.charge_item import ChargeItem
 from care.emr.models.invoice import Invoice
 from care.emr.models.payment_reconciliation import PaymentReconciliation
 from care.emr.models.scheduling.booking import TokenBooking
+from care.emr.resources.scheduling.schedule.spec import SchedulableResourceTypeOptions
 from care.emr.resources.account.sync_items import rebalance_account_task
-from care.emr.resources.charge_item.spec import ChargeItemStatusOptions
+from care.emr.resources.charge_item.spec import ChargeItemResourceOptions, ChargeItemStatusOptions
 from care.emr.resources.invoice.default_expression_evaluator import (
     evaluate_invoice_identifier_default_expression,
+)
+from care.emr.resources.charge_item.apply_charge_item_definition import (
+    apply_charge_item_definition,
 )
 from care.emr.resources.invoice.spec import InvoiceStatusOptions
 from care.emr.resources.invoice.sync_items import sync_invoice_items
@@ -30,7 +36,70 @@ from care.utils.time_util import care_now
 
 @receiver(post_save, sender=TokenBooking)
 def handle_appointment_invoice_payment(sender, instance, **kwargs):
-    charge_item = instance.charge_item
+    default_charge_item = instance.charge_item
+    token_slot = instance.token_slot
+    availability = token_slot.availability
+    schedule = availability.schedule
+    facility = schedule.resource.facility
+    revisit_charge_item_definition = schedule.revisit_charge_item_definition
+
+    last_booking = (
+        TokenBooking.objects.exclude(status__in=CANCELLED_STATUS_CHOICES)
+        .filter(
+            patient=instance.patient,
+            token_slot__availability__schedule__resource__facility=facility,
+            token_slot__availability__schedule__resource__resource_type=SchedulableResourceTypeOptions.healthcare_service.value,
+            charge_item__isnull=False,
+            charge_item__status=ChargeItemStatusOptions.paid.value,
+            token_slot__start_datetime__lte=token_slot.start_datetime,
+        )
+        .order_by("-token_slot__start_datetime")
+    ).first()
+
+    if last_booking:
+        booking_start_time = last_booking.charge_item.paid_on
+        if not booking_start_time:
+            diff_days = None
+        else:
+            new_booking_start_time = token_slot.start_datetime
+            diff_days = (booking_start_time - new_booking_start_time).days
+    else:
+        diff_days = None
+
+    charge_item_definition = None
+    if (
+        schedule.revisit_allowed_days
+        and default_charge_item
+        and diff_days is not None
+        and abs(diff_days) <= schedule.revisit_allowed_days
+    ):
+        charge_item_definition = revisit_charge_item_definition
+        # Cancel the signal triggeriring appointment's charge item and apply the revisit charge item definition
+        default_charge_item.status = ChargeItemStatusOptions.not_billable.value
+        default_charge_item.service_resource = None
+        default_charge_item.service_resource_id = None
+        default_charge_item.save(update_fields=["status", "service_resource", "service_resource_id"])
+        instance.charge_item = None
+        instance.save(update_fields=["charge_item"])
+
+    # No Else condition as we want to apply the normal charge item definition if revisit is not allowed or there is no previous booking
+    if charge_item_definition:
+        charge_item = apply_charge_item_definition(
+            charge_item_definition,
+            instance.patient,
+            token_slot.resource.facility,
+            quantity=1,
+        )
+        charge_item.service_resource = (
+            ChargeItemResourceOptions.appointment.value
+        )
+        charge_item.service_resource_id = str(instance.external_id)
+        charge_item.created_by = instance.created_by
+        charge_item.updated_by = instance.updated_by
+        charge_item.save()
+    else:
+        charge_item = default_charge_item
+
     if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
         with transaction.atomic():
             # create invoice
