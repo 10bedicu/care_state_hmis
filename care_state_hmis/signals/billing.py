@@ -114,6 +114,8 @@ def handle_appointment_invoice_payment(sender, instance, **kwargs):
                             charge_item.facility
                         ),
                         charge_items=[charge_item.id],
+                        created_by=instance.created_by,
+                        updated_by=instance.updated_by,
                     )
             except ObjectLocked as e:
                 raise ValidationError("Invoice creation failed") from e
@@ -153,6 +155,8 @@ def handle_appointment_invoice_payment(sender, instance, **kwargs):
                 status=PaymentReconciliationStatusOptions.active.value,
                 payment_datetime=care_now(),
                 target_invoice=invoice,
+                created_by=instance.created_by,
+                updated_by=instance.updated_by,
             )
 
 
