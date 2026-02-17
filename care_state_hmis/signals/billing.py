@@ -75,10 +75,7 @@ def handle_appointment_invoice_payment(sender, instance, **kwargs):
     ):
         charge_item_definition = revisit_charge_item_definition
         # Cancel the signal triggeriring appointment's charge item and apply the revisit charge item definition
-        default_charge_item.status = ChargeItemStatusOptions.not_billable.value
-        default_charge_item.service_resource = None
-        default_charge_item.service_resource_id = None
-        default_charge_item.save(update_fields=["status", "service_resource", "service_resource_id"])
+        default_charge_item.delete()
         instance.charge_item = None
         instance.save(update_fields=["charge_item"])
 
