@@ -35,7 +35,9 @@ from care.utils.time_util import care_now
 
 
 @receiver(post_save, sender=TokenBooking)
-def handle_appointment_invoice_payment(sender, instance, **kwargs):
+def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
+    if not created:
+        return
     default_charge_item = instance.charge_item
     token_slot = instance.token_slot
     availability = token_slot.availability
