@@ -1,3 +1,4 @@
+import logging
 from django.db import transaction
 from django.db.models import Case, Sum, When
 from django.db.models.signals import post_save
@@ -36,8 +37,14 @@ from care.utils.time_util import care_now
 
 @receiver(post_save, sender=TokenBooking)
 def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
-    if not created:
+    # Skip if no charge_item linked yet (e.g. initial INSERT before charge item is created)
+    if not instance.charge_item_id:
         return
+    # On updates, only proceed if charge_item was the field being set
+    update_fields = kwargs.get("update_fields")
+    if not created and (not update_fields or "charge_item" not in update_fields):
+        return
+
     default_charge_item = instance.charge_item
     token_slot = instance.token_slot
     availability = token_slot.availability
