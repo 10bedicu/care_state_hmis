@@ -35,7 +35,7 @@ from care.utils.lock import ObjectLocked
 from care.utils.time_util import care_now
 
 
-@receiver(post_save, sender=TokenBooking)
+@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
 def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     # Skip if no charge_item linked yet (e.g. initial INSERT before charge item is created)
     if not instance.charge_item_id:
@@ -44,6 +44,11 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     update_fields = kwargs.get("update_fields")
     if not created and (not update_fields or "charge_item" not in update_fields):
         return
+
+    # Prevent duplicate processing
+    if getattr(instance, "_processing_appointment_charge_item", False):
+        return
+    instance._processing_appointment_charge_item = True 
 
     default_charge_item = instance.charge_item
     token_slot = instance.token_slot
@@ -65,17 +70,12 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         .order_by("-token_slot__start_datetime")
     ).first()
 
-    if last_booking:
-        booking_start_time = last_booking.charge_item.paid_on
-        if not booking_start_time:
-            diff_days = None
-        else:
-            new_booking_start_time = token_slot.start_datetime
-            diff_days = (booking_start_time - new_booking_start_time).days
-    else:
-        diff_days = None
+    diff_days = None
+    if last_booking and (booking_start_time := last_booking.charge_item.paid_on):
+        new_booking_start_time = token_slot.start_datetime
+        diff_days = (booking_start_time - new_booking_start_time).days
 
-    charge_item_definition = None
+    charge_item = default_charge_item
     if (
         schedule.revisit_allowed_days
         and default_charge_item
@@ -83,13 +83,9 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         and abs(diff_days) <= schedule.revisit_allowed_days
     ):
         charge_item_definition = revisit_charge_item_definition
-        # Cancel the signal triggeriring appointment's charge item and apply the revisit charge item definition
+        # Cancel the signal triggering appointment's charge item and apply the revisit charge item definition
         default_charge_item.delete()
-        instance.charge_item = None
-        instance.save(update_fields=["charge_item"])
 
-    # No Else condition as we want to apply the normal charge item definition if revisit is not allowed or there is no previous booking
-    if charge_item_definition:
         charge_item = apply_charge_item_definition(
             charge_item_definition,
             instance.patient,
@@ -103,8 +99,10 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         charge_item.created_by = instance.created_by
         charge_item.updated_by = instance.updated_by
         charge_item.save()
-    else:
-        charge_item = default_charge_item
+
+        instance.charge_item = charge_item
+        instance.save(update_fields=["charge_item"])
+
 
     if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
         with transaction.atomic():
@@ -165,8 +163,11 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
                 updated_by=instance.updated_by,
             )
 
+    # Clean up the flag
+    delattr(instance, "_processing_appointment_charge_item") 
 
-@receiver(post_save, sender=PaymentReconciliation)
+
+@receiver(post_save, sender=PaymentReconciliation, dispatch_uid="handle_payment_reconciliation_rebalance")
 def handle_payment_reconciliation_rebalance(sender, instance, **kwargs):
     if instance.status != PaymentReconciliationStatusOptions.active.value:
         return
