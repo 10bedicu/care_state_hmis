@@ -52,6 +52,10 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     instance._processing_appointment_charge_item = True 
 
     default_charge_item = instance.charge_item
+    # Skip processing if the default charge item is already paid
+    if default_charge_item and default_charge_item.paid_invoice:
+        return
+
     token_slot = instance.token_slot
     availability = token_slot.availability
     schedule = availability.schedule
