@@ -82,27 +82,28 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         and diff_days is not None
         and abs(diff_days) <= schedule.revisit_allowed_days
     ):
-        charge_item_definition = revisit_charge_item_definition
-        # delete the default charge item created by core
+        # Cancel the default charge item created by the view
         default_charge_item.delete()
+        instance.charge_item = None
 
-        charge_item = apply_charge_item_definition(
-            charge_item_definition,
-            instance.patient,
-            token_slot.resource.facility,
-            quantity=1,
-        )
-        charge_item.service_resource = (
-            ChargeItemResourceOptions.appointment.value
-        )
-        charge_item.service_resource_id = str(instance.external_id)
-        charge_item.created_by = instance.created_by
-        charge_item.updated_by = instance.updated_by
-        charge_item.save()
+        # create new custom charge item if revisit_charge_item_definition is set
+        if revisit_charge_item_definition:
+            charge_item = apply_charge_item_definition(
+                revisit_charge_item_definition,
+                instance.patient,
+                token_slot.resource.facility,
+                quantity=1,
+            )
+            charge_item.service_resource = (
+                ChargeItemResourceOptions.appointment.value
+            )
+            charge_item.service_resource_id = str(instance.external_id)
+            charge_item.created_by = instance.created_by
+            charge_item.updated_by = instance.updated_by
+            charge_item.save()
+            instance.charge_item = charge_item
 
-        instance.charge_item = charge_item
         instance.save(update_fields=["charge_item"])
-
 
     if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
         with transaction.atomic():
