@@ -83,7 +83,7 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         and abs(diff_days) <= schedule.revisit_allowed_days
     ):
         charge_item_definition = revisit_charge_item_definition
-        # Cancel the signal triggering appointment's charge item and apply the revisit charge item definition
+        # delete the default charge item created by core
         default_charge_item.delete()
 
         charge_item = apply_charge_item_definition(
