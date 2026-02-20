@@ -1,3 +1,4 @@
+from curses import meta
 import logging
 from django.db import transaction
 from django.db.models import Case, Sum, When
@@ -100,6 +101,9 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
             charge_item.service_resource_id = str(instance.external_id)
             charge_item.created_by = instance.created_by
             charge_item.updated_by = instance.updated_by
+            charge_item.meta = {
+                "automated": True,
+            }
             charge_item.save()
             instance.charge_item = charge_item
 
@@ -121,6 +125,9 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
                         charge_items=[charge_item.id],
                         created_by=instance.created_by,
                         updated_by=instance.updated_by,
+                        meta={
+                            "automated": True,
+                        }
                     )
             except ObjectLocked as e:
                 raise ValidationError("Invoice creation failed") from e
