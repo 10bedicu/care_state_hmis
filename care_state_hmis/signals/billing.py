@@ -89,7 +89,7 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     ):
         # Cancel the default charge item created by the view
         default_charge_item.delete()
-        instance.charge_item = None
+        charge_item = None
 
         # create new custom charge item if revisit_charge_item_definition is set
         if revisit_charge_item_definition:
@@ -109,8 +109,9 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
                 "automated": True,
             }
             charge_item.save()
-            instance.charge_item = charge_item
 
+        # Update the state of charge item on the booking
+        instance.charge_item = charge_item
         instance.save(update_fields=["charge_item"])
 
     if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
