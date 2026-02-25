@@ -1,4 +1,5 @@
 import environ
+from django.conf import settings
 from care_state_hmis.apps import PLUGIN_NAME
 from rest_framework.settings import perform_import
 
@@ -20,7 +21,7 @@ class PluginSettings:  # pragma: no cover
 
     def __init__(
         self,
-        plugin_name: str = None,
+        plugin_name: str | None = None,
         defaults: dict | None = None,
         import_strings: set | None = None,
         required_settings: set | None = None,
@@ -55,6 +56,14 @@ class PluginSettings:  # pragma: no cover
         self._cached_attrs.add(attr)
         setattr(self, attr, val)
         return val
+
+    @property
+    def user_settings(self) -> dict:
+        if not hasattr(self, "_user_settings"):
+            self._user_settings = getattr(settings, "PLUGIN_CONFIGS", {}).get(
+                self.plugin_name, {}
+            )
+        return self._user_settings
 
 REQUIRED_SETTINGS = {}
 
