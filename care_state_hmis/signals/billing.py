@@ -1,5 +1,6 @@
 from curses import meta
 import logging
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Case, Sum, When
 from django.db.models.signals import post_save
@@ -34,6 +35,7 @@ from care.emr.resources.payment_reconciliation.spec import (
 )
 from care.utils.lock import ObjectLocked
 from care.utils.time_util import care_now
+from care_state_hmis.settings import plugin_settings
 
 
 @receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
@@ -62,15 +64,21 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     facility = schedule.resource.facility
     revisit_charge_item_definition = schedule.revisit_charge_item_definition
 
+    filters = {}
+    if plugin_settings.HMIS_INVOICE_ALLOW_REVISIT_ACROSS_DEPARTMENTS:
+        filters["token_slot__availability__schedule__resource__facility"] = facility
+        filters["token_slot__availability__schedule__resource__resource_type"] = SchedulableResourceTypeOptions.healthcare_service.value
+    else:
+        filters["token_slot__availability__schedule__resource"] = schedule.resource
+
     last_booking = (
         TokenBooking.objects.exclude(status__in=CANCELLED_STATUS_CHOICES)
         .filter(
             patient=instance.patient,
-            token_slot__availability__schedule__resource__facility=facility,
-            token_slot__availability__schedule__resource__resource_type=SchedulableResourceTypeOptions.healthcare_service.value,
             charge_item__isnull=False,
             charge_item__status=ChargeItemStatusOptions.paid.value,
             token_slot__start_datetime__lte=token_slot.start_datetime,
+            **filters,
         )
         .order_by("-token_slot__start_datetime")
     ).first()
@@ -179,6 +187,11 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     # Clean up the flag
     delattr(instance, "_processing_appointment_charge_item") 
 
+
+if settings.ENABLE_APPOINTMENT_INVOICE_AUTOPAYMENT:
+
+
+@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
 
 @receiver(post_save, sender=PaymentReconciliation, dispatch_uid="handle_payment_reconciliation_rebalance")
 def handle_payment_reconciliation_rebalance(sender, instance, **kwargs):

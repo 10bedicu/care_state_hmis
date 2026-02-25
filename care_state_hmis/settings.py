@@ -1,5 +1,6 @@
 import environ
 from care_state_hmis.apps import PLUGIN_NAME
+from rest_framework.settings import perform_import
 
 env = environ.Env()
 
@@ -32,10 +33,34 @@ class PluginSettings:  # pragma: no cover
         self.required_settings = required_settings or set()
         self._cached_attrs = set()
 
+    def __getattr__(self, attr):
+        if attr not in self.defaults:
+            raise AttributeError("Invalid setting: '%s'" % attr)
+
+        # Try to find the setting from user settings, then from environment variables
+        val = self.defaults[attr]
+        try:
+            val = self.user_settings[attr]
+        except KeyError:
+            try:
+                val = env(attr, cast=type(val))
+            except environ.ImproperlyConfigured:
+                # Fall back to defaults
+                pass
+
+        # Coerce import strings into classes
+        if attr in self.import_strings:
+            val = perform_import(val, attr)
+
+        self._cached_attrs.add(attr)
+        setattr(self, attr, val)
+        return val
 
 REQUIRED_SETTINGS = {}
 
-DEFAULTS = {}
+DEFAULTS = {
+    "HMIS_INVOICE_ALLOW_REVISIT_ACROSS_DEPARTMENTS": True,
+}
 
 plugin_settings = PluginSettings(
     PLUGIN_NAME, defaults=DEFAULTS, required_settings=REQUIRED_SETTINGS
