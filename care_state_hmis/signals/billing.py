@@ -188,11 +188,6 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     delattr(instance, "_processing_appointment_charge_item") 
 
 
-if settings.ENABLE_APPOINTMENT_INVOICE_AUTOPAYMENT:
-
-
-@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
-
 @receiver(post_save, sender=PaymentReconciliation, dispatch_uid="handle_payment_reconciliation_rebalance")
 def handle_payment_reconciliation_rebalance(sender, instance, **kwargs):
     if instance.status != PaymentReconciliationStatusOptions.active.value:
