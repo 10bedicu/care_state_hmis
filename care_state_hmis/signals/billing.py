@@ -1,11 +1,7 @@
-from curses import meta
-import logging
-from django.conf import settings
 from django.db import transaction
-from django.db.models import Case, Sum, When
+from django.db.models import Case, Sum, When, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from care.emr.models.encounter import Encounter
 from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
 from rest_framework.exceptions import ValidationError
 
@@ -71,8 +67,11 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     else:
         filters["token_slot__availability__schedule__resource"] = schedule.resource
 
-    last_booking = (
-        TokenBooking.objects.exclude(status__in=CANCELLED_STATUS_CHOICES)
+    last_charged_booking = (
+        TokenBooking.objects.exclude(
+            Q(status__in=CANCELLED_STATUS_CHOICES)
+            | Q(charge_item__charge_item_definition=revisit_charge_item_definition)
+        )
         .filter(
             patient=instance.patient,
             charge_item__isnull=False,
@@ -84,7 +83,7 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     ).first()
 
     diff_days = None
-    if last_booking and (booking_start_time := last_booking.charge_item.paid_on):
+    if last_charged_booking and (booking_start_time := last_charged_booking.charge_item.paid_on):
         new_booking_start_time = token_slot.start_datetime
         diff_days = (booking_start_time - new_booking_start_time).days
 
