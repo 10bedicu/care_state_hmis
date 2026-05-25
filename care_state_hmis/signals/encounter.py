@@ -1,7 +1,7 @@
 """Auto-assignment and immutability of the Hospital Identifier
 (stored as ``Encounter.external_identifier``).
 
-Format: ``{YYYY}{id:08d}`` derived from the encounter's ``created_date`` and
+Format: ``{YY}{MM}{id:08d}`` derived from the encounter's ``created_date`` and
 auto-increment primary key.
 """
 
@@ -18,8 +18,10 @@ HOSPITAL_IDENTIFIER_LABEL = "Hospital Identifier"
 
 def _format_identifier(encounter) -> str:
     created = encounter.created_date or timezone.now()
-    year = timezone.localtime(created).strftime("%Y")
-    return f"{year}{encounter.id:08d}"
+    # Read YY
+    year = timezone.localtime(created).strftime("%y")
+    month = timezone.localtime(created).strftime("%m")
+    return f"{year}{month}{encounter.id:08d}"
 
 
 @receiver(
@@ -58,7 +60,7 @@ def guard_hospital_identifier(sender, instance, **kwargs):
     dispatch_uid="hmis_hospital_identifier_assign",
 )
 def assign_hospital_identifier(sender, instance, created, **kwargs):
-    """On create, stamp ``external_identifier`` with ``{YYYY}{id:08d}``.
+    """On create, stamp ``external_identifier`` with ``{YY}{MM}{id:08d}``.
 
     No-op if an identifier was already supplied with the create payload.
     """

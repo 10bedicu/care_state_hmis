@@ -6,10 +6,10 @@ On encounter creation, stamp `Encounter.external_identifier` (labelled
 **"Hospital Identifier"** in the UI) with:
 
 ```
-{YYYY}{id:08d}
+{YY}{MM}{id:08d}
 ```
 
-e.g. encounter with int pk `42` created in 2026 → `"202600000042"`.
+e.g. encounter with int pk `42` created in May 2026 → `"260500000042"`.
 
 100% inside the plugin — no core changes, no per-facility config, no sequence
 table.
@@ -21,9 +21,9 @@ table.
 - `Encounter.id` is the auto-increment integer pk on `BaseModel`
   ([care/utils/models/base.py](care/utils/models/base.py#L15-L16)) — already
   unique, already monotonic, already race-safe (Postgres hands it out).
-- Year prefix keeps identifiers human-readable and groups them visually by
-  creation year.
-- 8-digit zero-pad gives 10⁸ encounters/year before overflow; identifier still
+- Year + month prefix keeps identifiers human-readable and groups them visually
+  by creation month.
+- 8-digit zero-pad gives 10⁸ encounters before overflow; identifier still
   formats sanely past that (digits just grow).
 
 ---
@@ -55,8 +55,9 @@ HOSPITAL_IDENTIFIER_LABEL = "Hospital Identifier"
 
 
 def _format_identifier(encounter) -> str:
-    year = timezone.localtime(encounter.created_date).strftime("%Y")
-    return f"{year}{encounter.id:08d}"
+    created = encounter.created_date or timezone.now()
+    local = timezone.localtime(created)
+    return f"{local.strftime('%y')}{local.strftime('%m')}{encounter.id:08d}"
 
 
 @receiver(
@@ -117,7 +118,7 @@ from . import encounter    # noqa
 
 ## Key choices
 
-- **`{YYYY}` derived from `created_date`**, not `now()`, so re-running the
+- **`{YY}{MM}` derived from `created_date`**, not `now()`, so re-running the
   format always yields the same string for a given encounter.
 - **`post_save` + `transaction.on_commit`** — value is stamped after the
   encounter row truly commits; rolled-back creates leave nothing behind.
@@ -137,7 +138,7 @@ from . import encounter    # noqa
 - No `select_for_update` / bucketed sequence allocation.
 - No `{FAC_CODE}`, `{CLASS}`, `{CLASS_TEXT}`, `{SEQ}` tokens.
 - No partial unique index on `emr_encounter(facility_id, external_identifier)`
-  — `id` is already globally unique, so `{YYYY}{id:08d}` is globally unique by
+  — `id` is already globally unique, so `{YY}{MM}{id:08d}` is globally unique by
   construction.
 - No admin entries, no migrations, no new models.
 
@@ -160,11 +161,11 @@ app/care_state_hmis/care_state_hmis/
 
 ## Test checklist
 
-- New encounter created → after commit, `external_identifier == f"{YYYY}{id:08d}"`.
+- New encounter created → after commit, `external_identifier == f"{YY}{MM}{id:08d}"`.
 - Encounter created with a payload-supplied `external_identifier` → not overwritten.
 - Later edit changing `external_identifier` → `ValidationError`:
   "Hospital Identifier cannot be changed once assigned."
 - Encounter create rolled back → no row written, nothing to clean up.
-- Two encounters with consecutive ids in the same year → identifiers differ in
+- Two encounters with consecutive ids in the same month → identifiers differ in
   the last digits only.
-- Encounter created on Jan 1 vs Dec 31 of the same year → same year prefix.
+- Encounter created on the 1st vs 31st of the same month → same `YYMM` prefix.
