@@ -70,11 +70,7 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
     encounter_pk = instance.pk
 
     def _do():
-        try:
-            encounter = Encounter.objects.only("id", "created_date").get(pk=encounter_pk)
-        except Encounter.DoesNotExist:
-            return
-        identifier = _format_identifier(encounter)
+        identifier = _format_identifier(instance)
         Encounter.objects.filter(
             pk=encounter_pk, external_identifier__isnull=True
         ).update(external_identifier=identifier)
