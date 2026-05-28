@@ -25,6 +25,28 @@ class PatientDemographicsExtension(PlugExtension):
             },
         },
         "additionalProperties": "false",
+    },
+    retrieve_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Patient Demographics",
+        "type": "object",
+        "x-ui": {"control": "grid"},
+        "properties": {
+            "related_person": {"type": "string", "title": "Related Person"},
+            "caste": {
+                "x-ui": {"render_blacklist": ["treatment_summary", "appointment_print"]},
+                "type": "string",
+                "title": "Caste",
+                "enum": ["OBC", "General", "SC", "ST", "Other"],
+            },
+            "religion": {
+                "x-ui": {"render_blacklist": ["treatment_summary", "appointment_print"]},
+                "type": "string",
+                "title": "Religion",
+                "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Other"],
+            },
+        },
+        "additionalProperties": "false",
     }
 
 
