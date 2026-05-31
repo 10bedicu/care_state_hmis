@@ -47,6 +47,8 @@ setup(
             "invoice_auto_balance.*",
             "patient_demographics",
             "patient_demographics.*",
+            "encounter_hospital_identifier",
+            "encounter_hospital_identifier.*",
         ]
     ),
     test_suite="tests",

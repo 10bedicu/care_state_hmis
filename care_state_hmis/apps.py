@@ -9,4 +9,3 @@ class CareSSMMConfig(AppConfig):
     def ready(self):
         import care_state_hmis.signals  # noqa
         import care_state_hmis.authorization  # noqa
-        import care_state_hmis.extensions # noqa
