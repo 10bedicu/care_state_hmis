@@ -39,7 +39,14 @@ setup(
     include_package_data=True,
     keywords="care_state_hmis",
     name="care_state_hmis",
-    packages=find_packages(include=["care_state_hmis", "care_state_hmis.*"]),
+    packages=find_packages(
+        include=[
+            "care_state_hmis",
+            "care_state_hmis.*",
+            "invoice_auto_balance",
+            "invoice_auto_balance.*",
+        ]
+    ),
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/ohcnetwork/care_state_hmis",
