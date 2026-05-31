@@ -49,6 +49,8 @@ setup(
             "patient_demographics.*",
             "encounter_hospital_identifier",
             "encounter_hospital_identifier.*",
+            "encounter_access_authorization",
+            "encounter_access_authorization.*",
         ]
     ),
     test_suite="tests",
