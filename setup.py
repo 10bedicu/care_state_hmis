@@ -51,6 +51,8 @@ setup(
             "encounter_hospital_identifier.*",
             "encounter_access_authorization",
             "encounter_access_authorization.*",
+            "appointment_invoice_payment",
+            "appointment_invoice_payment.*",
         ]
     ),
     test_suite="tests",
