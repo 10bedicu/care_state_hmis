@@ -45,6 +45,8 @@ setup(
             "care_state_hmis.*",
             "invoice_auto_balance",
             "invoice_auto_balance.*",
+            "patient_demographics",
+            "patient_demographics.*",
         ]
     ),
     test_suite="tests",
