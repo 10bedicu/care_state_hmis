@@ -39,10 +39,23 @@ setup(
     include_package_data=True,
     keywords="care_state_hmis",
     name="care_state_hmis",
-    packages=find_packages(include=["care_state_hmis", "care_state_hmis.*"]),
+    packages=find_packages(
+        include=[
+            "invoice_auto_balance",
+            "invoice_auto_balance.*",
+            "patient_demographics",
+            "patient_demographics.*",
+            "encounter_hospital_identifier",
+            "encounter_hospital_identifier.*",
+            "encounter_access_authorization",
+            "encounter_access_authorization.*",
+            "appointment_invoice_payment",
+            "appointment_invoice_payment.*",
+        ]
+    ),
     test_suite="tests",
     tests_require=test_requirements,
-    url="https://github.com/ohcnetwork/care_state_hmis",
+    url="https://github.com/10bedicu/care_state_hmis",
     version="0.3.0",
     zip_safe=False,
 )

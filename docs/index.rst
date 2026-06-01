@@ -1,5 +1,5 @@
-Welcome to Care SSMM's documentation!
-======================================
+Welcome to Care State HMIS Plugins documentation!
+=================================================
 
 .. toctree::
    :maxdepth: 2
