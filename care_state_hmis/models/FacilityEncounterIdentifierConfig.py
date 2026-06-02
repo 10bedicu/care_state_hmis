@@ -30,11 +30,24 @@ class FacilityEncounterIdentifierConfig(EMRBaseModel):
         ),
     )
     facility_code = models.CharField(max_length=16, blank=True)
+    enabled_encounter_classes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Encounter class codes for which identifiers are generated. "
+            "Empty list enables all encounter classes."
+        ),
+    )
     reset_period = models.CharField(
         max_length=16,
         choices=RESET_PERIOD_CHOICES,
         default="yearly",
     )
+
+    def is_enabled_for_encounter_class(self, encounter_class):
+        if not self.enabled_encounter_classes:
+            return True
+        return encounter_class in self.enabled_encounter_classes
 
     def __str__(self):
         return f"HospitalIdentifierConfig({self.facility_id})"

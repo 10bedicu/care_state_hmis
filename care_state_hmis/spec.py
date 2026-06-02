@@ -1,19 +1,20 @@
+from enum import StrEnum
 from string import Formatter
 
-from pydantic import UUID4, field_validator
-from enum import Enum
-
+from pydantic import UUID4, Field, field_validator
 
 from care.emr.resources.base import EMRResource
-
+from care.emr.resources.encounter.constants import ClassChoices
 from care_state_hmis.models import FacilityEncounterIdentifierConfig
 from care_state_hmis.services.identifier import ALLOWED_TOKENS
 
-class ResetPeriodChoices(str, Enum):
+
+class ResetPeriodChoices(StrEnum):
     none = "none"
     yearly = "yearly"
     monthly = "monthly"
     daily = "daily"
+
 
 class FacilityEncounterIdentifierConfigWriteSpec(EMRResource):
     __model__ = FacilityEncounterIdentifierConfig
@@ -21,6 +22,7 @@ class FacilityEncounterIdentifierConfigWriteSpec(EMRResource):
 
     pattern: str
     facility_code: str = ""
+    enabled_encounter_classes: list[ClassChoices] = Field(default_factory=list)
     reset_period: ResetPeriodChoices = ResetPeriodChoices.yearly
 
     @field_validator("pattern")
@@ -38,9 +40,10 @@ class FacilityEncounterIdentifierConfigWriteSpec(EMRResource):
                 continue
             if field_name not in ALLOWED_TOKENS:
                 allowed_tokens = ", ".join(sorted(ALLOWED_TOKENS))
-                raise ValueError(
+                message = (
                     f"Invalid token '{field_name}'. Allowed tokens: {allowed_tokens}."
                 )
+                raise ValueError(message)
             if field_name == "SEQ":
                 has_seq = True
 
@@ -50,6 +53,11 @@ class FacilityEncounterIdentifierConfigWriteSpec(EMRResource):
             )
 
         return value
+
+    @field_validator("enabled_encounter_classes")
+    @classmethod
+    def validate_enabled_encounter_classes(cls, value):
+        return list(dict.fromkeys(value))
 
     def perform_extra_deserialization(self, is_update, obj):
         if not is_update:
@@ -64,6 +72,7 @@ class FacilityEncounterIdentifierConfigReadSpec(EMRResource):
     facility: UUID4 | None = None
     pattern: str
     facility_code: str
+    enabled_encounter_classes: list[ClassChoices] = Field(default_factory=list)
     reset_period: ResetPeriodChoices
 
     @classmethod
