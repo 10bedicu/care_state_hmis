@@ -11,7 +11,10 @@ from django.dispatch import receiver
 
 from care.emr.models.encounter import Encounter
 from encounter_identifiers.models import FacilityEncounterIdentifierConfig
-from encounter_identifiers.services.identifier import generate_identifier
+from encounter_identifiers.services.identifier import (
+    IdentifierStampSkipped,
+    allocate_identifier,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,21 +74,11 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
     encounter_pk = instance.pk
 
     def _do():
-        # Re-fetch to avoid stamping an identifier on a row that was deleted
-        # between commit and on_commit execution.
-        try:
-            encounter = Encounter.objects.get(pk=encounter_pk)
-        except Encounter.DoesNotExist:
-            return
-        if encounter.external_identifier:
-            return
-
         for attempt in range(MAX_ASSIGNMENT_ATTEMPTS):
             try:
-                identifier = generate_identifier(encounter, config)
-                Encounter.objects.filter(pk=encounter_pk).update(
-                    external_identifier=identifier
-                )
+                allocate_identifier(instance, config)
+                return
+            except IdentifierStampSkipped:
                 return
             except IntegrityError:
                 if attempt == MAX_ASSIGNMENT_ATTEMPTS - 1:

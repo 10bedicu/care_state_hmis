@@ -49,7 +49,31 @@ class EncounterIdentifierSequence(models.Model):
         unique_together = [("facility", "bucket")]
 ```
 
-Both models are exported from `care_state_hmis/models/__init__.py`.
+`EncounterIdentifierAllocation` lives in
+`encounter_identifiers/models/EncounterIdentifierAllocation.py` and stores every
+identifier assigned by this plugin:
+
+```python
+class EncounterIdentifierAllocation(models.Model):
+    encounter = models.OneToOneField("emr.Encounter", on_delete=models.CASCADE)
+    facility = models.ForeignKey("facility.Facility", on_delete=models.CASCADE)
+    identifier = models.CharField(max_length=100)
+    bucket = models.CharField(max_length=16, default="")
+    sequence = models.BigIntegerField()
+    pattern = models.CharField(max_length=128)
+    reset_period = models.CharField(max_length=16)
+    allocated_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["identifier"], name="unique_hmis_encounter_identifier"),
+            models.UniqueConstraint(fields=["facility", "bucket", "sequence"], name="unique_hmis_encounter_identifier_seq"),
+        ]
+```
+
+The allocation table is the plugin-owned uniqueness boundary. The core
+`Encounter.external_identifier` field is updated only after a reservation row has
+been created successfully.
 
 ### Configuration API
 
@@ -143,8 +167,11 @@ Valid `enabled_encounter_classes` values are the CARE encounter class codes:
   or `YYYY-MM-DD`.
 - `_allocate_sequence(facility_id, bucket)` uses `select_for_update()` and an
   atomic transaction so concurrent workers cannot receive the same value.
-- `generate_identifier(encounter, config)` formats the configured pattern using
-  the generated context.
+- `allocate_identifier(encounter, config)` allocates a sequence, renders the
+  configured pattern, creates an `EncounterIdentifierAllocation`, and then stamps
+  `Encounter.external_identifier`.
+- `generate_identifier(encounter, config)` is a compatibility wrapper around
+  `allocate_identifier`.
 
 ## Signals
 
@@ -170,10 +197,11 @@ On a newly created encounter, the receiver:
 3. Skips if `enabled_encounter_classes` is non-empty and the encounter class is
    not in the configured list.
 4. Schedules assignment with `transaction.on_commit()`.
-5. Re-fetches the encounter after commit and skips if it was deleted or already
-   received an identifier.
-6. Generates the identifier and writes it with `QuerySet.update()`.
-7. Retries up to three times on `IntegrityError`.
+5. Allocates a sequence and renders the configured identifier.
+6. Creates an `EncounterIdentifierAllocation` row with a unique `identifier`.
+7. Writes the reserved identifier to `Encounter.external_identifier` with a
+   conditional update that does not overwrite a value set by another path.
+8. Retries up to three times on allocation-table `IntegrityError`.
 
 Because assignment runs after commit, the generated Hospital Identifier may not
 be present in the original encounter create response. It appears on subsequent
@@ -212,6 +240,7 @@ encounters. Assignment only happens at create time.
 app/care_state_hmis/encounter_identifiers/
 ├── models/
 │   ├── __init__.py
+│   ├── EncounterIdentifierAllocation.py
 │   ├── EncounterIdentifierSequence.py
 │   └── FacilityEncounterIdentifierConfig.py
 ├── services/
@@ -231,7 +260,7 @@ registration is handled by the plugin app config.
 
 ## Migration note
 
-The current code introduces two new models. A database migration is required
+The current code introduces three plugin models. Database migrations are required
 before the feature can be used in an environment.
 
 ## Test checklist
@@ -253,7 +282,11 @@ before the feature can be used in an environment.
 - Payload supplies `external_identifier` on encounter create -> not overwritten,
   and subsequent edits are rejected.
 - Concurrent encounter creates in one facility -> distinct sequence values.
-- Two facilities with the same pattern -> independent sequences.
+- Two facilities with the same pattern -> independent sequences, with final
+  rendered identifiers still globally reserved by the allocation table.
+- Generated identifiers are first reserved in `EncounterIdentifierAllocation`.
+- Duplicate generated identifiers cause allocation retry/failure, not duplicate
+  encounter identifiers.
 - Encounter create rolled back -> no identifier is stamped on a row.
 - Edit on existing encounter changing `external_identifier` -> validation error.
 - `encounter_class` changed after creation -> `external_identifier` unchanged.

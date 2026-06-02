@@ -51,3 +51,82 @@ class PatientDemographicsExtension(PlugExtension):
 
 
 ExtensionRegistry.register(PatientDemographicsExtension())
+
+class EncounterAttenderExtension(PlugExtension):
+    extension_name = "encounter_attender"
+    extension_version = "1.0.0"
+    resource_type = ExtensionResource.encounter
+    write_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Encounter Attender",
+        "type": "object",
+        "properties": {
+            "attender": {
+                "type": "object",
+                "title": "Attender Details",
+                "x-ui": {"control": "grid"},
+                "properties": {
+                    "attender_name": {"type": "string", "title": "Attender Name"},
+                    "attender_phone": {"type": "string", "title": "Attender Phone Number"},
+                    "attender_relation": {"type": "string", "title": "Attender Relation"},
+                    "attender_address": {"type": "string", "title": "Attender Address"},
+                },
+            },
+        },
+        "additionalProperties": "false"
+    }
+    retrieve_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Encounter Attender",
+        "type": "object",
+        "properties": {
+            "attender": {
+                "type": "object",
+                "title": "Attender Details",
+                "x-ui": {"control": "grid"},
+                "properties": {
+                    "attender_name": {"type": "string", "title": "Attender Name"},
+                    "attender_phone": {"type": "string", "title": "Attender Phone Number"},
+                    "attender_relation": {"type": "string", "title": "Attender Relation"},
+                    "attender_address": {"type": "string", "title": "Attender Address"},
+                },
+            },
+        },
+        "additionalProperties": "false"
+    }
+
+
+ExtensionRegistry.register(EncounterAttenderExtension())
+
+class EncounterLocationExtension(PlugExtension):
+    extension_name = "encounter_kind_location_assignment"
+    extension_version = "1.0.0"
+    resource_type = ExtensionResource.encounter
+    write_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Location Assignment",
+        "type": "object",
+        "x-ui": {"control": "grid", "blacklist": ["ip_admission_form"]},
+        "properties": {
+            "location": {
+                "type": "string",
+                "title": "Ward/Wing Admitted To",
+            },
+        },
+        "additionalProperties": "false"
+    }
+    retrieve_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Location Assignment",
+        "type": "object",
+        "x-ui": {"control": "grid", "blacklist": ["ip_admission_form"]},
+        "properties": {
+            "location": {
+                "type": "string",
+                "title": "Ward/Wing Admitted To",
+            },
+        },
+        "additionalProperties": "false"
+    }
+
+ExtensionRegistry.register(EncounterLocationExtension())

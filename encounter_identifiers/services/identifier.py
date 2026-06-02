@@ -1,10 +1,13 @@
 """Hospital Identifier (Encounter.external_identifier) generation service."""
 
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
-from encounter_identifiers.models import EncounterIdentifierSequence
+from encounter_identifiers.models import (
+    EncounterIdentifierAllocation,
+    EncounterIdentifierSequence,
+)
 
 ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "YY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}
 
@@ -28,8 +31,12 @@ def _class_text(encounter_class: str | None) -> str:
     return ENCOUNTER_CLASS_TEXT_MAP.get(encounter_class, encounter_class.upper())
 
 
-def _bucket_for(reset_period: str) -> str:
-    now = timezone.localtime()
+class IdentifierStampSkipped(Exception):
+    """Raised when the encounter can no longer receive a plugin allocation."""
+
+
+def _bucket_for(reset_period: str, now=None) -> str:
+    now = now or timezone.localtime()
     if reset_period == "yearly":
         return now.strftime("%Y")
     if reset_period == "monthly":
@@ -58,11 +65,7 @@ def _allocate_sequence(facility_id, bucket: str) -> int:
         return row.last_value
 
 
-def generate_identifier(encounter, config) -> str:
-    """Render the Hospital Identifier for a freshly-created encounter."""
-    bucket = _bucket_for(config.reset_period)
-    seq = _allocate_sequence(encounter.facility_id, bucket)
-    now = timezone.localtime()
+def _render_identifier(encounter, config, seq: int, now) -> str:
     ctx = {
         "FAC_CODE": config.facility_code or str(encounter.facility_id)[:6],
         "YYYY": now.strftime("%Y"),
@@ -74,3 +77,60 @@ def generate_identifier(encounter, config) -> str:
         "CLASS_TEXT": _class_text(encounter.encounter_class),
     }
     return config.pattern.format(**ctx)
+
+
+def generate_identifier(encounter, config) -> str:
+    """Reserve, stamp, and return the Hospital Identifier for an encounter."""
+    allocation = allocate_identifier(encounter, config)
+    if allocation:
+        return allocation.identifier
+    return encounter.external_identifier or ""
+
+
+def allocate_identifier(encounter, config) -> EncounterIdentifierAllocation | None:
+    """Reserve and stamp a plugin-generated identifier for an encounter.
+
+    ``EncounterIdentifierAllocation`` is the durable uniqueness boundary. The
+    core encounter field is updated only after a reservation row is created.
+    """
+    existing_allocation = EncounterIdentifierAllocation.objects.filter(
+        encounter=encounter
+    ).first()
+    if existing_allocation:
+        encounter.__class__.objects.filter(pk=encounter.pk).filter(
+            Q(external_identifier__isnull=True) | Q(external_identifier="")
+        ).update(external_identifier=existing_allocation.identifier)
+        return existing_allocation
+
+    now = timezone.localtime()
+    bucket = _bucket_for(config.reset_period, now)
+    seq = _allocate_sequence(encounter.facility_id, bucket)
+    identifier = _render_identifier(encounter, config, seq, now)
+
+    with transaction.atomic():
+        existing_allocation = EncounterIdentifierAllocation.objects.filter(
+            encounter=encounter
+        ).first()
+        if existing_allocation:
+            encounter.__class__.objects.filter(pk=encounter.pk).filter(
+                Q(external_identifier__isnull=True) | Q(external_identifier="")
+            ).update(external_identifier=existing_allocation.identifier)
+            return existing_allocation
+
+        allocation = EncounterIdentifierAllocation.objects.create(
+            encounter=encounter,
+            facility_id=encounter.facility_id,
+            identifier=identifier,
+            bucket=bucket,
+            sequence=seq,
+            pattern=config.pattern,
+            reset_period=config.reset_period,
+        )
+        updated = (
+            encounter.__class__.objects.filter(pk=encounter.pk)
+            .filter(Q(external_identifier__isnull=True) | Q(external_identifier=""))
+            .update(external_identifier=identifier)
+        )
+        if not updated:
+            raise IdentifierStampSkipped
+        return allocation
