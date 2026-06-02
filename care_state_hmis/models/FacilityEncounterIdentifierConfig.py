@@ -1,7 +1,9 @@
 from django.db import models
 
+from care.emr.models.base import EMRBaseModel
 
-class FacilityEncounterIdentifierConfig(models.Model):
+
+class FacilityEncounterIdentifierConfig(EMRBaseModel):
     """Per-facility configuration for auto-generating ``Encounter.external_identifier``.
 
     The external_identifier is presented to users as **"Hospital Identifier"**.
@@ -28,25 +30,24 @@ class FacilityEncounterIdentifierConfig(models.Model):
         ),
     )
     facility_code = models.CharField(max_length=16, blank=True)
+    enabled_encounter_classes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Encounter class codes for which identifiers are generated. "
+            "Empty list enables all encounter classes."
+        ),
+    )
     reset_period = models.CharField(
         max_length=16,
         choices=RESET_PERIOD_CHOICES,
         default="yearly",
     )
 
+    def is_enabled_for_encounter_class(self, encounter_class):
+        if not self.enabled_encounter_classes:
+            return True
+        return encounter_class in self.enabled_encounter_classes
+
     def __str__(self):
         return f"HospitalIdentifierConfig({self.facility_id})"
-
-
-class EncounterIdentifierSequence(models.Model):
-    """Race-safe per-(facility, bucket) monotonic counter."""
-
-    facility = models.ForeignKey("facility.Facility", on_delete=models.CASCADE)
-    bucket = models.CharField(max_length=16, default="")
-    last_value = models.BigIntegerField(default=0)
-
-    class Meta:
-        unique_together = [("facility", "bucket")]
-
-    def __str__(self):
-        return f"EncounterIdentifierSequence({self.facility_id}, {self.bucket!r}, {self.last_value})"

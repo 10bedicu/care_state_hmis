@@ -1,117 +1,193 @@
-# Plan: Auto-assign `Encounter.external_identifier` per Facility (plugin care_state_hmis)
+# Auto-assign `Encounter.external_identifier` per facility
 
 ## Goal
 
-On encounter creation, populate the core field `Encounter.external_identifier` (labelled
-**"Hospital Identifier"** in the UI) from a per-facility pattern
-(e.g. `ENC-{FAC_CODE}-{YYYY}-{SEQ:06d}`). 100% inside the plugin — no core changes.
+On encounter creation, populate the core field `Encounter.external_identifier`
+(labelled **"Hospital Identifier"** in the UI) from a per-facility pattern,
+for example `ENC-{FAC_CODE}-{YYYY}-{SEQ:06d}`. This is implemented inside the
+`care_state_hmis` plugin without core CARE model changes.
 
-### Policy decisions (locked)
+## Current implementation
 
-- **Identifier is immutable** once assigned. Manual edits and `encounter_class`
-  changes do **not** rewrite it. Class is captured at create time only.
-- **All user-facing error messages refer to the field as "Hospital Identifier"**, never
-  `external_identifier`.
+The latest implementation adds per-facility configuration models, a validation
+spec, and an API endpoint for configuring the identifier pattern.
 
----
+### Data model
 
-## 1. Data model (plugin)
-
-**`care_state_hmis/models.py`**
+`FacilityEncounterIdentifierConfig` lives in
+`care_state_hmis/models/FacilityEncounterIdentifierConfig.py` and stores one
+configuration per facility:
 
 ```python
-class FacilityEncounterIdentifierConfig(models.Model):
+class FacilityEncounterIdentifierConfig(EMRBaseModel):
     facility = models.OneToOneField(
         "facility.Facility",
         on_delete=models.CASCADE,
         related_name="hmis_encounter_identifier_config",
     )
-    pattern = models.CharField(max_length=128)              # "ENC-{FAC_CODE}-{YYYY}-{SEQ:06d}"
+    pattern = models.CharField(max_length=128)
     facility_code = models.CharField(max_length=16, blank=True)
+    enabled_encounter_classes = models.JSONField(default=list, blank=True)
     reset_period = models.CharField(
         max_length=16,
-        choices=[("none","none"),("yearly","yearly"),("monthly","monthly"),("daily","daily")],
+        choices=[("none", "none"), ("yearly", "yearly"), ("monthly", "monthly"), ("daily", "daily")],
         default="yearly",
     )
+```
 
+`EncounterIdentifierSequence` lives in
+`care_state_hmis/models/EncounterIdentifierSequence.py` and stores the
+race-safe counter for each `(facility, bucket)` pair:
+
+```python
 class EncounterIdentifierSequence(models.Model):
     facility = models.ForeignKey("facility.Facility", on_delete=models.CASCADE)
-    bucket = models.CharField(max_length=16, default="")    # "", "2026", "2026-05", "2026-05-20"
+    bucket = models.CharField(max_length=16, default="")
     last_value = models.BigIntegerField(default=0)
 
     class Meta:
         unique_together = [("facility", "bucket")]
 ```
 
-Register `FacilityEncounterIdentifierConfig` in `admin.py` for ops configuration.
+Both models are exported from `care_state_hmis/models/__init__.py`.
 
----
+### Configuration API
 
-## 2. Migration (plugin)
+`care_state_hmis/urls.py` exposes one facility-scoped configuration endpoint:
 
-`care_state_hmis/migrations/0001_initial.py`:
-
-- Create the two models above.
-- Add a partial unique index on the core `emr_encounter` table via `RunSQL`:
-
-```sql
-CREATE UNIQUE INDEX hmis_unique_encounter_hospital_identifier_per_facility
-ON emr_encounter (facility_id, external_identifier)
-WHERE external_identifier IS NOT NULL;
+```text
+GET  /api/care_state_hmis/facility/<facility_external_id>/identifier-config/
+POST /api/care_state_hmis/facility/<facility_external_id>/identifier-config/
+PUT  /api/care_state_hmis/facility/<facility_external_id>/identifier-config/
 ```
 
-Reverse SQL drops the index.
+The endpoint is backed by
+`care_state_hmis/viewsets/facility_identifier_config.py` and requires
+`can_update_facility_obj` permission for the target facility. `GET` returns an
+empty object when a facility has no configuration. `POST` creates the first
+configuration for a facility, and `PUT` updates the existing one.
 
----
+Write payload:
 
-## 3. Identifier service
-
-**`care_state_hmis/services/identifier.py`**
-
-```python
-ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS"}
-
-def _bucket_for(reset_period: str) -> str: ...
-def _allocate_sequence(facility_id, bucket) -> int: ...   # select_for_update
-def generate_identifier(encounter, config) -> str: ...
+```json
+{
+  "pattern": "{CLASS_TEXT}-{FAC_CODE}-{YYYY}-{SEQ:06d}",
+  "facility_code": "GH",
+  "enabled_encounter_classes": ["imp", "emer"],
+  "reset_period": "yearly"
+}
 ```
 
-- `select_for_update()` + bucketed counter = race-safe under concurrent workers, and
-  supports dynamic resets (which a Postgres `SEQUENCE` can't do cleanly).
-- `.format(**ctx)` is safe because only whitelisted keys are present.
-- `{CLASS}` is resolved **at creation time** and never re-evaluated.
+Read payload:
 
----
+```json
+{
+  "id": "<config_external_id>",
+  "facility": "<facility_external_id>",
+  "pattern": "{CLASS_TEXT}-{FAC_CODE}-{YYYY}-{SEQ:06d}",
+  "facility_code": "GH",
+  "enabled_encounter_classes": ["imp", "emer"],
+  "reset_period": "yearly"
+}
+```
 
-## 4. Signals
+Only one `FacilityEncounterIdentifierConfig` can exist for a facility. A second
+`POST` returns a validation error: `Configuration already exists for this facility.`
 
-**`care_state_hmis/signals/encounter.py`**
+`enabled_encounter_classes` is an optional allowlist. When the list is empty,
+identifiers are generated for every encounter class. When the list contains one
+or more values, identifiers are generated only for encounters whose
+`encounter_class` is in the list. For example, `["imp"]` enables only inpatient
+encounters and `["imp", "emer"]` enables inpatient and emergency encounters.
 
-### 4a. Immutability guard (`pre_save`)
+### Pattern validation
 
-Blocks any later mutation of `external_identifier` once set. Error message uses the
-user-facing label "Hospital Identifier".
+`care_state_hmis/spec.py` validates writes with
+`FacilityEncounterIdentifierConfigWriteSpec`.
 
-### 4b. Auto-assignment (`post_save` on create)
+Allowed tokens:
 
-- `post_save` + `created` — runs once, after the row exists.
-- Skip if already set — payload-supplied identifiers are respected (and then frozen).
-- `.filter(pk=...).update(...)` — bypasses re-entering signals; also bypasses the
-  immutability guard because no `pre_save` fires on `QuerySet.update`.
-- `transaction.on_commit` — sequence numbers are not burned if the encounter create
-  rolls back. Tradeoff: identifier appears on subsequent reads, not the create response.
-- `dispatch_uid` — guards against duplicate registration on plugin reload.
-- Retries up to 3× on `IntegrityError` from the partial unique index.
+- `{FAC_CODE}` - configured `facility_code`; if blank, generation falls back to
+  the first six characters of the encounter's facility id.
+- `{YYYY}`, `{MM}`, `{DD}` - current local assignment date parts.
+- `{SEQ}` - per-facility, per-bucket monotonic sequence value.
+- `{CLASS}` - upper-cased encounter class code.
+- `{CLASS_TEXT}` - short encounter class label. Known mappings are `imp -> IP`,
+  `amb -> OP`, `obsenc -> OBS`, `emer -> ER`, `vr -> VR`, and `hh -> HH`.
 
-### How `encounter_class` changes are handled
+The pattern must include `{SEQ}`. Format specs are supported, so `{SEQ:06d}`
+renders a zero-padded six-digit sequence.
 
-No re-issue. The identifier baked at create time stands. If `pattern` contains
-`{CLASS}`, the value reflects the **original** class — intentional, matches typical
-MRN/visit-number semantics.
+Valid `reset_period` values:
 
-### When the facility has no `FacilityEncounterIdentifierConfig`
+- `none` - one sequence per facility.
+- `yearly` - one sequence per facility and year. This is the default.
+- `monthly` - one sequence per facility and month.
+- `daily` - one sequence per facility and day.
 
-The `post_save` receiver short-circuits silently:
+Valid `enabled_encounter_classes` values are the CARE encounter class codes:
+
+- `imp` - inpatient.
+- `amb` - ambulatory / outpatient.
+- `obsenc` - observation.
+- `emer` - emergency.
+- `vr` - virtual.
+- `hh` - home health.
+
+## Identifier service
+
+`care_state_hmis/services/identifier.py` renders the final identifier.
+
+- `ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}`
+- `_bucket_for(reset_period)` maps the reset period to `""`, `YYYY`, `YYYY-MM`,
+  or `YYYY-MM-DD`.
+- `_allocate_sequence(facility_id, bucket)` uses `select_for_update()` and an
+  atomic transaction so concurrent workers cannot receive the same value.
+- `generate_identifier(encounter, config)` formats the configured pattern using
+  the generated context.
+
+## Signals
+
+`care_state_hmis/signals/encounter.py` wires the behavior to `Encounter` saves.
+
+### Immutability guard (`pre_save`)
+
+Once `external_identifier` has a value, later changes are rejected with:
+
+```text
+Hospital Identifier cannot be changed once assigned.
+```
+
+The user-facing error message intentionally says "Hospital Identifier", not
+`external_identifier`.
+
+### Auto-assignment (`post_save` on create)
+
+On a newly created encounter, the receiver:
+
+1. Skips if `external_identifier` was supplied in the create payload.
+2. Skips if the facility has no `FacilityEncounterIdentifierConfig`.
+3. Skips if `enabled_encounter_classes` is non-empty and the encounter class is
+   not in the configured list.
+4. Schedules assignment with `transaction.on_commit()`.
+5. Re-fetches the encounter after commit and skips if it was deleted or already
+   received an identifier.
+6. Generates the identifier and writes it with `QuerySet.update()`.
+7. Retries up to three times on `IntegrityError`.
+
+Because assignment runs after commit, the generated Hospital Identifier may not
+be present in the original encounter create response. It appears on subsequent
+reads.
+
+### `encounter_class` changes
+
+No re-issue happens after creation. If a pattern contains `{CLASS}` or
+`{CLASS_TEXT}`, the identifier reflects the encounter class at assignment time.
+Later `encounter_class` changes do not rewrite it.
+
+### Missing facility configuration
+
+If a facility has no configuration, the receiver short-circuits silently:
 
 ```python
 try:
@@ -122,55 +198,62 @@ except FacilityEncounterIdentifierConfig.DoesNotExist:
 
 Concretely:
 
-- `Encounter.external_identifier` keeps whatever was supplied (typically `None`).
+- `Encounter.external_identifier` keeps whatever was supplied, usually `None`.
 - No sequence row is created or touched.
 - No `transaction.on_commit` callback is scheduled.
-- Nothing is logged — this is a normal no-op, not an error.
-- The immutability guard still applies: if the value is later set manually (admin / API),
-  it is frozen from that point on.
+- The immutability guard still applies if a value is later set manually.
 
-**Configuring a facility _after_ encounters already exist does not back-fill** existing
-rows — assignment only happens at create time. A back-fill management command is
-out of scope; add one if/when the need arises.
+Configuring a facility after encounters already exist does not back-fill those
+encounters. Assignment only happens at create time.
 
-Wire up in `signals/__init__.py`:
+## File layout
 
-```python
-from . import billing      # noqa
-from . import encounter    # noqa
-```
-
----
-
-## 5. File layout
-
-```
+```text
 app/care_state_hmis/care_state_hmis/
-├── admin.py                          # + FacilityEncounterIdentifierConfig admin
-├── models.py                         # + the two models (new file)
-├── migrations/
-│   └── 0001_initial.py               # models + partial unique index on emr_encounter
-├── services/
+├── models/
 │   ├── __init__.py
-│   └── identifier.py                 # generate_identifier, _allocate_sequence, _bucket_for
-└── signals/
-    ├── __init__.py                   # + from . import encounter
-    └── encounter.py                  # pre_save guard + post_save assigner
+│   ├── EncounterIdentifierSequence.py
+│   └── FacilityEncounterIdentifierConfig.py
+├── services/
+│   └── identifier.py
+├── signals/
+│   ├── __init__.py
+│   └── encounter.py
+├── spec.py
+├── urls.py
+└── viewsets/
+    ├── __init__.py
+    └── facility_identifier_config.py
 ```
 
-`apps.py` already imports `care_state_hmis.signals`, so no change there.
+`apps.py` already imports `care_state_hmis.signals`, so signal registration is
+handled by the plugin app config.
 
----
+## Migration note
 
-## 6. Test checklist
+The current code introduces two new models. A database migration is required
+before the feature can be used in an environment.
 
-- No `FacilityEncounterIdentifierConfig` → `external_identifier` stays `None`.
-- Payload supplies `external_identifier` → not overwritten, and subsequent edits are rejected.
-- 50 concurrent encounter creates in one facility → 50 distinct contiguous sequence numbers.
-- `reset_period="yearly"` → bucket rolls at Jan 1 (freeze with `time_machine`).
-- Two facilities, same pattern → independent sequences.
-- Encounter create rolled back → sequence value not consumed (verifies `on_commit`).
-- Edit on existing encounter changing `external_identifier` → `ValidationError`:
-  "Hospital Identifier cannot be changed once assigned."
-- `encounter_class` changed after creation → `external_identifier` unchanged.
-- Pattern containing `{CLASS}` reflects class at creation time even after a later class change.
+## Test checklist
+
+- No `FacilityEncounterIdentifierConfig` -> `external_identifier` stays `None`.
+- `GET /identifier-config/` without config -> `{}`.
+- `POST /identifier-config/` creates the facility config when authorized.
+- Duplicate `POST /identifier-config/` -> validation error.
+- `PUT /identifier-config/` updates pattern, facility code, enabled encounter
+  classes, and reset period.
+- Empty `enabled_encounter_classes` -> identifiers generated for all encounter
+  classes.
+- `enabled_encounter_classes=["imp"]` -> only inpatient encounters receive
+  generated identifiers.
+- `enabled_encounter_classes=["imp", "emer"]` -> inpatient and emergency
+  encounters receive generated identifiers; other classes are skipped.
+- Invalid token in `pattern` -> validation error listing allowed tokens.
+- Pattern without `{SEQ}` -> validation error.
+- Payload supplies `external_identifier` on encounter create -> not overwritten,
+  and subsequent edits are rejected.
+- Concurrent encounter creates in one facility -> distinct sequence values.
+- Two facilities with the same pattern -> independent sequences.
+- Encounter create rolled back -> no identifier is stamped on a row.
+- Edit on existing encounter changing `external_identifier` -> validation error.
+- `encounter_class` changed after creation -> `external_identifier` unchanged.

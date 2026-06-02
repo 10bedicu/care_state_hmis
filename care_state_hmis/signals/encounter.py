@@ -36,7 +36,10 @@ def guard_hospital_identifier(sender, instance, **kwargs):
         old = Encounter.objects.only("external_identifier").get(pk=instance.pk)
     except Encounter.DoesNotExist:
         return
-    if old.external_identifier and old.external_identifier != instance.external_identifier:
+    if (
+        old.external_identifier
+        and old.external_identifier != instance.external_identifier
+    ):
         raise ValidationError(
             {
                 "external_identifier": (
@@ -61,6 +64,8 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
     try:
         config = instance.facility.hmis_encounter_identifier_config
     except FacilityEncounterIdentifierConfig.DoesNotExist:
+        return
+    if not config.is_enabled_for_encounter_class(instance.encounter_class):
         return
 
     encounter_pk = instance.pk
