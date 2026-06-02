@@ -24,9 +24,7 @@ class HMISEncounterAccess(AuthorizationHandler):
         # Cannot write to a closed encounter
         if encounter.status not in COMPLETED_CHOICES:
             return False
-        return self.check_permission_in_encounter(
-            user, encounter, EncounterPermissions.can_write_encounter.name
-        )
+        return self.check_permission_in_encounter(user, encounter, EncounterPermissions.can_write_encounter.name)
 
 
 AuthorizationController.override_authz_controllers.append(HMISEncounterAccess)
