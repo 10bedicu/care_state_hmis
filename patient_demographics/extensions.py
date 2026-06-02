@@ -107,7 +107,7 @@ class EncounterLocationExtension(PlugExtension):
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Location Assignment",
         "type": "object",
-        "x-ui": {"control": "grid", "blacklist": ["ip_admission_form"]},
+        "x-ui": {"control": "grid", "render_blacklist": ["ip_admission_form"]},
         "properties": {
             "location": {
                 "type": "string",
@@ -120,7 +120,7 @@ class EncounterLocationExtension(PlugExtension):
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Location Assignment",
         "type": "object",
-        "x-ui": {"control": "grid", "blacklist": ["ip_admission_form"]},
+        "x-ui": {"control": "grid", "render_blacklist": ["ip_admission_form"]},
         "properties": {
             "location": {
                 "type": "string",
