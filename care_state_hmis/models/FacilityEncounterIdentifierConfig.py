@@ -1,7 +1,9 @@
 from django.db import models
 
+from care.emr.models.base import EMRBaseModel
 
-class FacilityEncounterIdentifierConfig(models.Model):
+
+class FacilityEncounterIdentifierConfig(EMRBaseModel):
     """Per-facility configuration for auto-generating ``Encounter.external_identifier``.
 
     The external_identifier is presented to users as **"Hospital Identifier"**.
@@ -36,17 +38,3 @@ class FacilityEncounterIdentifierConfig(models.Model):
 
     def __str__(self):
         return f"HospitalIdentifierConfig({self.facility_id})"
-
-
-class EncounterIdentifierSequence(models.Model):
-    """Race-safe per-(facility, bucket) monotonic counter."""
-
-    facility = models.ForeignKey("facility.Facility", on_delete=models.CASCADE)
-    bucket = models.CharField(max_length=16, default="")
-    last_value = models.BigIntegerField(default=0)
-
-    class Meta:
-        unique_together = [("facility", "bucket")]
-
-    def __str__(self):
-        return f"EncounterIdentifierSequence({self.facility_id}, {self.bucket!r}, {self.last_value})"
