@@ -44,9 +44,6 @@ class FacilityEncounterIdentifierConfig(EMRBaseModel):
         default="yearly",
     )
 
-    class Meta:
-        app_label = "care_state_hmis"
-
     def is_enabled_for_encounter_class(self, encounter_class):
         if not self.enabled_encounter_classes:
             return True
