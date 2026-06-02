@@ -11,4 +11,10 @@ Adds extra demographic fields to the CARE patient resource through the plug exte
 
 ## Configuration Notes
 
-This plugin does not define plugin-specific settings in this repository.
+#### HMIS_EXTENSIONS_ENABLE_LOCATION_KIND
+
+The encounter extension to support marking a location[kind]; This is disabled by default
+
+#### HMIS_EXTENSIONS_ENABLE_ATTENDER
+
+The encounter extension to support collecting the details of the attender/bystander of the patient during the encounter; This is disabled by default

@@ -1,6 +1,7 @@
 from care.emr.extensions.base import PlugExtension, ExtensionResource
 from care.emr.registries.extensions.registry import ExtensionRegistry
 
+from patient_demographics.settings import plugin_settings
 
 class PatientDemographicsExtension(PlugExtension):
     extension_name = "patient_demographics"
@@ -95,8 +96,8 @@ class EncounterAttenderExtension(PlugExtension):
         "additionalProperties": "false"
     }
 
-
-ExtensionRegistry.register(EncounterAttenderExtension())
+if plugin_settings.HMIS_EXTENSIONS_ENABLE_ATTENDER:
+    ExtensionRegistry.register(EncounterAttenderExtension())
 
 class EncounterLocationExtension(PlugExtension):
     extension_name = "encounter_kind_location_assignment"
@@ -129,4 +130,5 @@ class EncounterLocationExtension(PlugExtension):
         "additionalProperties": "false"
     }
 
-ExtensionRegistry.register(EncounterLocationExtension())
+if plugin_settings.HMIS_EXTENSIONS_ENABLE_LOCATION_KIND:
+    ExtensionRegistry.register(EncounterLocationExtension())

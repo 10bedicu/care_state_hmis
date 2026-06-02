@@ -67,6 +67,9 @@ class PluginSettings:  # pragma: no cover
 
 REQUIRED_SETTINGS = {}
 
-DEFAULTS = {}
+DEFAULTS = {
+    "HMIS_EXTENSIONS_ENABLE_LOCATION_KIND": False,
+    "HMIS_EXTENSIONS_ENABLE_ATTENDER": False,
+}
 
 plugin_settings = PluginSettings(PLUGIN_NAME, defaults=DEFAULTS, required_settings=REQUIRED_SETTINGS)
