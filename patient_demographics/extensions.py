@@ -67,9 +67,9 @@ class EncounterAttenderExtension(PlugExtension):
                 "title": "Attender Details",
                 "x-ui": {"control": "grid"},
                 "properties": {
+                    "attender_relation": {"type": "string", "title": "Attender Relation", "enum": ["S/O","D/O","F/O","M/O","W/O","H/O","Guardian/O"]},
                     "attender_name": {"type": "string", "title": "Attender Name"},
                     "attender_phone": {"type": "string", "title": "Attender Phone Number"},
-                    "attender_relation": {"type": "string", "title": "Attender Relation"},
                     "attender_address": {"type": "string", "title": "Attender Address"},
                 },
             },
@@ -86,9 +86,9 @@ class EncounterAttenderExtension(PlugExtension):
                 "title": "Attender Details",
                 "x-ui": {"control": "grid"},
                 "properties": {
+                    "attender_relation": {"type": "string", "title": "Attender Relation", "enum": ["S/O","D/O","F/O","M/O","W/O","H/O","Guardian/O"]},
                     "attender_name": {"type": "string", "title": "Attender Name"},
                     "attender_phone": {"type": "string", "title": "Attender Phone Number"},
-                    "attender_relation": {"type": "string", "title": "Attender Relation"},
                     "attender_address": {"type": "string", "title": "Attender Address"},
                 },
             },
