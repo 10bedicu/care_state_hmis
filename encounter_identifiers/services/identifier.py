@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from encounter_identifiers.models import EncounterIdentifierSequence
 
-ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}
+ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "YY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}
 
 # Hardcoded mapping of ``Encounter.encounter_class`` codes (see
 # ``care.emr.resources.encounter.constants.ClassChoices``) to the short
@@ -66,6 +66,7 @@ def generate_identifier(encounter, config) -> str:
     ctx = {
         "FAC_CODE": config.facility_code or str(encounter.facility_id)[:6],
         "YYYY": now.strftime("%Y"),
+        "YY": now.strftime("%y"),
         "MM": now.strftime("%m"),
         "DD": now.strftime("%d"),
         "SEQ": seq,

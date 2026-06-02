@@ -24,7 +24,7 @@ class FacilityEncounterIdentifierConfig(EMRBaseModel):
     pattern = models.CharField(
         max_length=128,
         help_text=(
-            "Format string. Allowed tokens: {FAC_CODE}, {YYYY}, {MM}, {DD}, "
+            "Format string. Allowed tokens: {FAC_CODE}, {YYYY}, {YY}, {MM}, {DD}, "
             "{SEQ}, {CLASS}, {CLASS_TEXT}. "
             "Example: {CLASS_TEXT}-{FAC_CODE}-{YYYY}-{SEQ:06d}"
         ),

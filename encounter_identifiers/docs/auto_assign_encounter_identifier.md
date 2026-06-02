@@ -109,7 +109,7 @@ Allowed tokens:
 
 - `{FAC_CODE}` - configured `facility_code`; if blank, generation falls back to
   the first six characters of the encounter's facility id.
-- `{YYYY}`, `{MM}`, `{DD}` - current local assignment date parts.
+- `{YYYY}`, `{YY}`, `{MM}`, `{DD}` - current local assignment date parts.
 - `{SEQ}` - per-facility, per-bucket monotonic sequence value.
 - `{CLASS}` - upper-cased encounter class code.
 - `{CLASS_TEXT}` - short encounter class label. Known mappings are `imp -> IP`,
@@ -138,7 +138,7 @@ Valid `enabled_encounter_classes` values are the CARE encounter class codes:
 
 `encounter_identifiers/services/identifier.py` renders the final identifier.
 
-- `ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}`
+- `ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "YY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}`
 - `_bucket_for(reset_period)` maps the reset period to `""`, `YYYY`, `YYYY-MM`,
   or `YYYY-MM-DD`.
 - `_allocate_sequence(facility_id, bucket)` uses `select_for_update()` and an
