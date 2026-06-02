@@ -29,7 +29,7 @@ from care.emr.resources.scheduling.schedule.spec import SchedulableResourceTypeO
 from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
 from care.utils.lock import ObjectLocked
 from care.utils.time_util import care_now
-from care_state_hmis.settings import plugin_settings
+from settings import plugin_settings
 
 
 @receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
