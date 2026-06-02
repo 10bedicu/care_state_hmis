@@ -2,7 +2,7 @@ import environ
 from django.conf import settings
 from rest_framework.settings import perform_import
 
-from apps import PLUGIN_NAME
+from encounter_hospital_identifier.apps import PLUGIN_NAME
 
 env = environ.Env()
 

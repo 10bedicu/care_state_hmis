@@ -4,6 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from rest_framework.exceptions import ValidationError
 
+from appointment_invoice_payment.settings import plugin_settings
 from care.emr.locks.billing import InvoiceCreateLock, InvoiceLock
 from care.emr.models.invoice import Invoice
 from care.emr.models.payment_reconciliation import PaymentReconciliation
@@ -29,7 +30,6 @@ from care.emr.resources.scheduling.schedule.spec import SchedulableResourceTypeO
 from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
 from care.utils.lock import ObjectLocked
 from care.utils.time_util import care_now
-from settings import plugin_settings
 
 
 @receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
