@@ -51,6 +51,8 @@ setup(
             "encounter_access_authorization.*",
             "appointment_invoice_payment",
             "appointment_invoice_payment.*",
+            "encounter_attender",
+            "encounter_attender.*",
         ]
     ),
     test_suite="tests",
