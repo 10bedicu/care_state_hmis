@@ -9,6 +9,7 @@ class EncounterIdentifierSequence(models.Model):
     last_value = models.BigIntegerField(default=0)
 
     class Meta:
+        app_label = "care_state_hmis"
         unique_together = [("facility", "bucket")]
 
     def __str__(self):

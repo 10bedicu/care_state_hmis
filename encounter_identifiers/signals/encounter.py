@@ -10,8 +10,8 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from care.emr.models.encounter import Encounter
-from care_state_hmis.models import FacilityEncounterIdentifierConfig
-from care_state_hmis.services.identifier import generate_identifier
+from encounter_identifiers.models import FacilityEncounterIdentifierConfig
+from encounter_identifiers.services.identifier import generate_identifier
 
 logger = logging.getLogger(__name__)
 

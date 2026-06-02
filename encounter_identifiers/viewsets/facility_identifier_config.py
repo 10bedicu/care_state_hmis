@@ -11,8 +11,8 @@ from care.facility.models import Facility
 from care.security.authorization import AuthorizationController
 from care.utils.shortcuts import get_object_or_404
 
-from care_state_hmis.models import FacilityEncounterIdentifierConfig
-from care_state_hmis.spec import (
+from encounter_identifiers.models import FacilityEncounterIdentifierConfig
+from encounter_identifiers.spec import (
     FacilityEncounterIdentifierConfigReadSpec,
     FacilityEncounterIdentifierConfigWriteSpec,
 )

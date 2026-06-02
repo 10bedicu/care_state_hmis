@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from care_state_hmis.models import EncounterIdentifierSequence
+from encounter_identifiers.models import EncounterIdentifierSequence
 
 ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}
 

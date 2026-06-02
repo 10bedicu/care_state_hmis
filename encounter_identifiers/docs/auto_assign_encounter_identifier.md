@@ -15,7 +15,7 @@ spec, and an API endpoint for configuring the identifier pattern.
 ### Data model
 
 `FacilityEncounterIdentifierConfig` lives in
-`care_state_hmis/models/FacilityEncounterIdentifierConfig.py` and stores one
+`encounter_identifiers/models/FacilityEncounterIdentifierConfig.py` and stores one
 configuration per facility:
 
 ```python
@@ -36,7 +36,7 @@ class FacilityEncounterIdentifierConfig(EMRBaseModel):
 ```
 
 `EncounterIdentifierSequence` lives in
-`care_state_hmis/models/EncounterIdentifierSequence.py` and stores the
+`encounter_identifiers/models/EncounterIdentifierSequence.py` and stores the
 race-safe counter for each `(facility, bucket)` pair:
 
 ```python
@@ -53,7 +53,7 @@ Both models are exported from `care_state_hmis/models/__init__.py`.
 
 ### Configuration API
 
-`care_state_hmis/urls.py` exposes one facility-scoped configuration endpoint:
+`encounter_identifiers/urls.py` exposes one facility-scoped configuration endpoint:
 
 ```text
 GET  /api/care_state_hmis/facility/<facility_external_id>/identifier-config/
@@ -62,7 +62,7 @@ PUT  /api/care_state_hmis/facility/<facility_external_id>/identifier-config/
 ```
 
 The endpoint is backed by
-`care_state_hmis/viewsets/facility_identifier_config.py` and requires
+`encounter_identifiers/viewsets/facility_identifier_config.py` and requires
 `can_update_facility_obj` permission for the target facility. `GET` returns an
 empty object when a facility has no configuration. `POST` creates the first
 configuration for a facility, and `PUT` updates the existing one.
@@ -102,7 +102,7 @@ encounters and `["imp", "emer"]` enables inpatient and emergency encounters.
 
 ### Pattern validation
 
-`care_state_hmis/spec.py` validates writes with
+`encounter_identifiers/spec.py` validates writes with
 `FacilityEncounterIdentifierConfigWriteSpec`.
 
 Allowed tokens:
@@ -136,7 +136,7 @@ Valid `enabled_encounter_classes` values are the CARE encounter class codes:
 
 ## Identifier service
 
-`care_state_hmis/services/identifier.py` renders the final identifier.
+`encounter_identifiers/services/identifier.py` renders the final identifier.
 
 - `ALLOWED_TOKENS = {"FAC_CODE", "YYYY", "MM", "DD", "SEQ", "CLASS", "CLASS_TEXT"}`
 - `_bucket_for(reset_period)` maps the reset period to `""`, `YYYY`, `YYYY-MM`,
@@ -148,7 +148,7 @@ Valid `enabled_encounter_classes` values are the CARE encounter class codes:
 
 ## Signals
 
-`care_state_hmis/signals/encounter.py` wires the behavior to `Encounter` saves.
+`encounter_identifiers/signals/encounter.py` wires the behavior to `Encounter` saves.
 
 ### Immutability guard (`pre_save`)
 
@@ -209,7 +209,7 @@ encounters. Assignment only happens at create time.
 ## File layout
 
 ```text
-app/care_state_hmis/care_state_hmis/
+app/care_state_hmis/encounter_identifiers/
 ├── models/
 │   ├── __init__.py
 │   ├── EncounterIdentifierSequence.py
@@ -226,8 +226,8 @@ app/care_state_hmis/care_state_hmis/
     └── facility_identifier_config.py
 ```
 
-`apps.py` already imports `care_state_hmis.signals`, so signal registration is
-handled by the plugin app config.
+`care_state_hmis/apps.py` imports `encounter_identifiers.signals`, so signal
+registration is handled by the plugin app config.
 
 ## Migration note
 

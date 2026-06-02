@@ -5,8 +5,8 @@ from pydantic import UUID4, Field, field_validator
 
 from care.emr.resources.base import EMRResource
 from care.emr.resources.encounter.constants import ClassChoices
-from care_state_hmis.models import FacilityEncounterIdentifierConfig
-from care_state_hmis.services.identifier import ALLOWED_TOKENS
+from encounter_identifiers.models import FacilityEncounterIdentifierConfig
+from encounter_identifiers.services.identifier import ALLOWED_TOKENS
 
 
 class ResetPeriodChoices(StrEnum):

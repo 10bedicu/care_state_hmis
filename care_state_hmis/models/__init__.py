@@ -1,6 +1,4 @@
-from care_state_hmis.models.FacilityEncounterIdentifierConfig import (
-    FacilityEncounterIdentifierConfig,
-)
-from care_state_hmis.models.EncounterIdentifierSequence import (
+from encounter_identifiers.models import (
     EncounterIdentifierSequence,
+    FacilityEncounterIdentifierConfig,
 )
