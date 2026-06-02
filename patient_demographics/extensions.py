@@ -107,11 +107,12 @@ class EncounterLocationExtension(PlugExtension):
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Location Assignment",
         "type": "object",
-        "x-ui": {"control": "grid", "render_blacklist": ["ip_admission_form"]},
+        "x-ui": {"control": "grid"},
         "properties": {
             "location": {
                 "type": "string",
                 "title": "Ward/Wing Admitted To",
+                "x-ui": {"render_blacklist": ["ip_admission_form"]}
             },
         },
         "additionalProperties": "false"
@@ -120,11 +121,12 @@ class EncounterLocationExtension(PlugExtension):
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Location Assignment",
         "type": "object",
-        "x-ui": {"control": "grid", "render_blacklist": ["ip_admission_form"]},
+        "x-ui": {"control": "grid"},
         "properties": {
             "location": {
                 "type": "string",
                 "title": "Ward/Wing Admitted To",
+                "x-ui": {"render_blacklist": ["ip_admission_form"]}
             },
         },
         "additionalProperties": "false"
