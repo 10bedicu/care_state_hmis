@@ -1,4 +1,3 @@
-from django.db import transaction
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -108,66 +107,6 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
         # Update the state of charge item on the booking
         instance.charge_item = charge_item
         instance.save(update_fields=["charge_item"])
-
-    if charge_item and charge_item.status == ChargeItemStatusOptions.billable.value:
-        with transaction.atomic():
-            # create invoice
-            try:
-                with InvoiceCreateLock():
-                    invoice = Invoice.objects.create(
-                        facility_id=charge_item.facility_id,
-                        account_id=charge_item.account_id,
-                        patient_id=instance.patient_id,
-                        status=InvoiceStatusOptions.draft.value,
-                        number=evaluate_invoice_identifier_default_expression(charge_item.facility),
-                        charge_items=[charge_item.id],
-                        created_by=instance.created_by,
-                        updated_by=instance.updated_by,
-                        meta={
-                            "automated": True,
-                        },
-                    )
-            except ObjectLocked as e:
-                raise ValidationError("Invoice creation failed") from e
-
-            charge_item.paid_invoice = invoice
-            charge_item.status = ChargeItemStatusOptions.billed.value
-            charge_item.save(update_fields=["paid_invoice", "status"])
-            sync_invoice_items(invoice)
-            invoice.save(
-                update_fields=[
-                    "total_net",
-                    "total_gross",
-                    "total_price_components",
-                    "charge_items_copy",
-                ]
-            )
-
-            # issue invoice
-            with InvoiceLock(invoice):
-                invoice.status = InvoiceStatusOptions.issued.value
-                invoice.issue_date = care_now()
-                invoice.save(update_fields=["status", "issue_date"])
-
-            # record payment
-            PaymentReconciliation.objects.create(
-                facility_id=charge_item.facility_id,
-                account_id=charge_item.account_id,
-                amount=charge_item.total_price,
-                tendered_amount=charge_item.total_price,
-                returned_amount=0,
-                is_credit_note=False,
-                issuer_type=PaymentReconciliationIssuerTypeOptions.patient.value,
-                kind=PaymentReconciliationKindOptions.deposit.value,
-                method=PaymentReconciliationPaymentMethodOptions.cash.value,
-                outcome=PaymentReconciliationOutcomeOptions.complete.value,
-                reconciliation_type=PaymentReconciliationTypeOptions.payment.value,
-                status=PaymentReconciliationStatusOptions.active.value,
-                payment_datetime=care_now(),
-                target_invoice=invoice,
-                created_by=instance.created_by,
-                updated_by=instance.updated_by,
-            )
 
     # Clean up the flag
     delattr(instance, "_processing_appointment_charge_item")
