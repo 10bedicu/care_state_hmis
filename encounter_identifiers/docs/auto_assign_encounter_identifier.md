@@ -168,8 +168,8 @@ Valid `enabled_encounter_classes` values are the CARE encounter class codes:
 - `_allocate_sequence(facility_id, bucket)` uses `select_for_update()` and an
   atomic transaction so concurrent workers cannot receive the same value.
 - `allocate_identifier(encounter, config)` allocates a sequence, renders the
-  configured pattern, creates an `EncounterIdentifierAllocation`, and then stamps
-  `Encounter.external_identifier`.
+  configured pattern, creates an `EncounterIdentifierAllocation`, stamps
+  `Encounter.external_identifier`, and updates the in-memory encounter instance.
 - `generate_identifier(encounter, config)` is a compatibility wrapper around
   `allocate_identifier`.
 
@@ -196,16 +196,18 @@ On a newly created encounter, the receiver:
 2. Skips if the facility has no `FacilityEncounterIdentifierConfig`.
 3. Skips if `enabled_encounter_classes` is non-empty and the encounter class is
    not in the configured list.
-4. Schedules assignment with `transaction.on_commit()`.
+4. Allocates and stamps the identifier synchronously inside the active encounter
+   create transaction.
 5. Allocates a sequence and renders the configured identifier.
 6. Creates an `EncounterIdentifierAllocation` row with a unique `identifier`.
 7. Writes the reserved identifier to `Encounter.external_identifier` with a
    conditional update that does not overwrite a value set by another path.
 8. Retries up to three times on allocation-table `IntegrityError`.
 
-Because assignment runs after commit, the generated Hospital Identifier may not
-be present in the original encounter create response. It appears on subsequent
-reads.
+Because assignment runs before the encounter create transaction commits, any
+allocation failure rolls back the original encounter create request. The
+generated Hospital Identifier is also present in the original encounter create
+response.
 
 ### `encounter_class` changes
 
@@ -228,7 +230,7 @@ Concretely:
 
 - `Encounter.external_identifier` keeps whatever was supplied, usually `None`.
 - No sequence row is created or touched.
-- No `transaction.on_commit` callback is scheduled.
+- No allocation work is scheduled.
 - The immutability guard still applies if a value is later set manually.
 
 Configuring a facility after encounters already exist does not back-fill those

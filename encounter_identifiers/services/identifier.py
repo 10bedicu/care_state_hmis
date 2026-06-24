@@ -31,7 +31,7 @@ def _class_text(encounter_class: str | None) -> str:
     return ENCOUNTER_CLASS_TEXT_MAP.get(encounter_class, encounter_class.upper())
 
 
-class IdentifierStampSkipped(Exception):
+class IdentifierStampSkippedError(Exception):
     """Raised when the encounter can no longer receive a plugin allocation."""
 
 
@@ -97,9 +97,11 @@ def allocate_identifier(encounter, config) -> EncounterIdentifierAllocation | No
         encounter=encounter
     ).first()
     if existing_allocation:
-        encounter.__class__.objects.filter(pk=encounter.pk).filter(
+        updated = encounter.__class__.objects.filter(pk=encounter.pk).filter(
             Q(external_identifier__isnull=True) | Q(external_identifier="")
         ).update(external_identifier=existing_allocation.identifier)
+        if updated:
+            encounter.external_identifier = existing_allocation.identifier
         return existing_allocation
 
     now = timezone.localtime()
@@ -112,9 +114,11 @@ def allocate_identifier(encounter, config) -> EncounterIdentifierAllocation | No
             encounter=encounter
         ).first()
         if existing_allocation:
-            encounter.__class__.objects.filter(pk=encounter.pk).filter(
+            updated = encounter.__class__.objects.filter(pk=encounter.pk).filter(
                 Q(external_identifier__isnull=True) | Q(external_identifier="")
             ).update(external_identifier=existing_allocation.identifier)
+            if updated:
+                encounter.external_identifier = existing_allocation.identifier
             return existing_allocation
 
         allocation = EncounterIdentifierAllocation.objects.create(
@@ -132,5 +136,6 @@ def allocate_identifier(encounter, config) -> EncounterIdentifierAllocation | No
             .update(external_identifier=identifier)
         )
         if not updated:
-            raise IdentifierStampSkipped
+            raise IdentifierStampSkippedError
+        encounter.external_identifier = identifier
         return allocation

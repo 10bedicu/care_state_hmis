@@ -5,14 +5,14 @@
 import logging
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from care.emr.models.encounter import Encounter
 from encounter_identifiers.models import FacilityEncounterIdentifierConfig
 from encounter_identifiers.services.identifier import (
-    IdentifierStampSkipped,
+    IdentifierStampSkippedError,
     allocate_identifier,
 )
 
@@ -78,7 +78,7 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
             try:
                 allocate_identifier(instance, config)
                 return
-            except IdentifierStampSkipped:
+            except IdentifierStampSkippedError:
                 return
             except IntegrityError:
                 if attempt == MAX_ASSIGNMENT_ATTEMPTS - 1:
@@ -90,4 +90,4 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
                     )
                     raise
 
-    transaction.on_commit(_do)
+    _do()
