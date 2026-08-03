@@ -1,38 +1,19 @@
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from rest_framework.exceptions import ValidationError
 
-from appointment_invoice_payment.settings import plugin_settings
-from care.emr.locks.billing import InvoiceCreateLock, InvoiceLock
-from care.emr.models.invoice import Invoice
-from care.emr.models.payment_reconciliation import PaymentReconciliation
+from appointment_revisit_charge.settings import plugin_settings
 from care.emr.models.scheduling.booking import TokenBooking
 from care.emr.resources.charge_item.apply_charge_item_definition import (
     apply_charge_item_definition,
 )
 from care.emr.resources.charge_item.spec import ChargeItemResourceOptions, ChargeItemStatusOptions
-from care.emr.resources.invoice.default_expression_evaluator import (
-    evaluate_invoice_identifier_default_expression,
-)
-from care.emr.resources.invoice.spec import InvoiceStatusOptions
-from care.emr.resources.invoice.sync_items import sync_invoice_items
-from care.emr.resources.payment_reconciliation.spec import (
-    PaymentReconciliationIssuerTypeOptions,
-    PaymentReconciliationKindOptions,
-    PaymentReconciliationOutcomeOptions,
-    PaymentReconciliationPaymentMethodOptions,
-    PaymentReconciliationStatusOptions,
-    PaymentReconciliationTypeOptions,
-)
 from care.emr.resources.scheduling.schedule.spec import SchedulableResourceTypeOptions
 from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
-from care.utils.lock import ObjectLocked
-from care.utils.time_util import care_now
 
 
-@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_invoice_payment")
-def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
+@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_revisit_charge")
+def handle_appointment_revisit_charge(sender, instance, created, **kwargs):
     # Skip if no charge_item linked yet (e.g. initial INSERT before charge item is created)
     if not instance.charge_item_id:
         return
@@ -58,7 +39,7 @@ def handle_appointment_invoice_payment(sender, instance, created, **kwargs):
     revisit_charge_item_definition = schedule.revisit_charge_item_definition
 
     filters = {}
-    if plugin_settings.HMIS_INVOICE_ALLOW_REVISIT_ACROSS_DEPARTMENTS:
+    if plugin_settings.HMIS_ALLOW_REVISIT_ACROSS_DEPARTMENTS:
         filters["token_slot__availability__schedule__resource__facility"] = facility
         filters["token_slot__availability__schedule__resource__resource_type"] = SchedulableResourceTypeOptions.healthcare_service.value
     else:
