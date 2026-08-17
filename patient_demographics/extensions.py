@@ -115,6 +115,7 @@ class EncounterLocationExtension(PlugExtension):
                 "x-ui": {"render_blacklist": ["ip_admission_form"]}
             },
         },
+        **({"required": ["location"]} if plugin_settings.HMIS_EXTENSIONS_LOCATION_REQUIRED else {}),
         "additionalProperties": "false"
     }
     retrieve_schema = {
