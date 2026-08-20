@@ -20,10 +20,6 @@ class EncounterIdentifierAllocation(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["identifier"],
-                name="unique_hmis_encounter_identifier",
-            ),
-            models.UniqueConstraint(
                 fields=["facility", "bucket", "sequence"],
                 name="unique_hmis_encounter_identifier_seq",
             ),
