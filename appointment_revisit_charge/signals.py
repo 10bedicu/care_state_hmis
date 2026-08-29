@@ -1,0 +1,95 @@
+from django.db.models import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from appointment_revisit_charge.settings import plugin_settings
+from care.emr.models.scheduling.booking import TokenBooking
+from care.emr.resources.charge_item.apply_charge_item_definition import (
+    apply_charge_item_definition,
+)
+from care.emr.resources.charge_item.spec import ChargeItemResourceOptions, ChargeItemStatusOptions
+from care.emr.resources.scheduling.schedule.spec import SchedulableResourceTypeOptions
+from care.emr.resources.scheduling.slot.spec import CANCELLED_STATUS_CHOICES
+
+
+@receiver(post_save, sender=TokenBooking, dispatch_uid="handle_appointment_revisit_charge")
+def handle_appointment_revisit_charge(sender, instance, created, **kwargs):
+    # Skip if no charge_item linked yet (e.g. initial INSERT before charge item is created)
+    if not instance.charge_item_id:
+        return
+    # On updates, only proceed if charge_item was the field being set
+    update_fields = kwargs.get("update_fields")
+    if not created and (not update_fields or "charge_item" not in update_fields):
+        return
+
+    # Prevent duplicate processing
+    if getattr(instance, "_processing_appointment_charge_item", False):
+        return
+    instance._processing_appointment_charge_item = True
+
+    try:
+        default_charge_item = instance.charge_item
+        # Skip processing if the default charge item is already paid
+        if default_charge_item and default_charge_item.paid_invoice:
+            return
+
+        token_slot = instance.token_slot
+        availability = token_slot.availability
+        schedule = availability.schedule
+        facility = schedule.resource.facility
+        revisit_charge_item_definition = schedule.revisit_charge_item_definition
+
+        filters = {}
+        if plugin_settings.HMIS_ALLOW_REVISIT_ACROSS_DEPARTMENTS:
+            filters["token_slot__availability__schedule__resource__facility"] = facility
+            filters["token_slot__availability__schedule__resource__resource_type"] = SchedulableResourceTypeOptions.healthcare_service.value
+        else:
+            filters["token_slot__availability__schedule__resource"] = schedule.resource
+
+        last_charged_booking = (
+            TokenBooking.objects.exclude(
+                Q(status__in=CANCELLED_STATUS_CHOICES) | Q(charge_item__charge_item_definition=revisit_charge_item_definition)
+            )
+            .filter(
+                patient=instance.patient,
+                charge_item__isnull=False,
+                charge_item__status=ChargeItemStatusOptions.paid.value,
+                token_slot__start_datetime__lte=token_slot.start_datetime,
+                **filters,
+            )
+            .order_by("-token_slot__start_datetime")
+        ).first()
+
+        diff_days = None
+        if last_charged_booking and (last_paid_on := last_charged_booking.charge_item.paid_on):
+            diff_days = (token_slot.start_datetime - last_paid_on).days
+
+        charge_item = default_charge_item
+        if schedule.revisit_allowed_days and default_charge_item and diff_days is not None and 0 <= diff_days <= schedule.revisit_allowed_days:
+            # Cancel the default charge item created by the view
+            default_charge_item.delete()
+            charge_item = None
+
+            # create new custom charge item if revisit_charge_item_definition is set
+            if revisit_charge_item_definition:
+                charge_item = apply_charge_item_definition(
+                    revisit_charge_item_definition,
+                    instance.patient,
+                    token_slot.resource.facility,
+                    quantity=1,
+                )
+                charge_item.service_resource = ChargeItemResourceOptions.appointment.value
+                charge_item.service_resource_id = str(instance.external_id)
+                charge_item.created_by = instance.created_by
+                charge_item.updated_by = instance.updated_by
+                charge_item.meta = {
+                    "automated": True,
+                }
+                charge_item.save()
+
+            # Update the state of charge item on the booking
+            instance.charge_item = charge_item
+            instance.save(update_fields=["charge_item"])
+    finally:
+        # Clean up the flag
+        delattr(instance, "_processing_appointment_charge_item")
