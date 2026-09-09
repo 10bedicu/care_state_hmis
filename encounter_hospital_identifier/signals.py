@@ -41,17 +41,8 @@ def guard_hospital_identifier(sender, instance, **kwargs):
         old = Encounter.objects.only("external_identifier").get(pk=instance.pk)
     except Encounter.DoesNotExist:
         return
-    if (
-        old.external_identifier
-        and old.external_identifier != instance.external_identifier
-    ):
-        raise ValidationError(
-            {
-                "external_identifier": (
-                    f"{HOSPITAL_IDENTIFIER_LABEL} cannot be changed once assigned."
-                )
-            }
-        )
+    if old.external_identifier and old.external_identifier != instance.external_identifier:
+        raise ValidationError({"external_identifier": (f"{HOSPITAL_IDENTIFIER_LABEL} cannot be changed once assigned.")})
 
 
 @receiver(
@@ -71,8 +62,6 @@ def assign_hospital_identifier(sender, instance, created, **kwargs):
 
     def _do():
         identifier = _format_identifier(instance)
-        Encounter.objects.filter(
-            pk=encounter_pk, external_identifier__isnull=True
-        ).update(external_identifier=identifier)
+        Encounter.objects.filter(pk=encounter_pk, external_identifier__isnull=True).update(external_identifier=identifier)
 
     transaction.on_commit(_do)

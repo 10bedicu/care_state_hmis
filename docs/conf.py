@@ -47,7 +47,7 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "Care SSMM"
+project = "Care State HMIS Plugins"
 copyright = "2024, Vignesh Hari"
 author = "Vignesh Hari"
 
@@ -128,7 +128,7 @@ latex_documents = [
     (
         master_doc,
         "care_state_hmis.tex",
-        "Care SSMM Documentation",
+        "Care State HMIS Plugins Documentation",
         "Vignesh Hari",
         "manual",
     ),
@@ -139,7 +139,9 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "care_state_hmis", "Care SSMM Documentation", [author], 1)]
+man_pages = [
+    (master_doc, "care_state_hmis", "Care State HMIS Plugins Documentation", [author], 1)
+]
 
 
 # -- Options for Texinfo output ----------------------------------------
@@ -151,7 +153,7 @@ texinfo_documents = [
     (
         master_doc,
         "care_state_hmis",
-        "Care SSMM Documentation",
+        "Care State HMIS Plugins Documentation",
         author,
         "care_state_hmis",
         "One line description of project.",

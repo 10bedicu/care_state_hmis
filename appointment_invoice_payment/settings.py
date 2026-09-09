@@ -1,7 +1,8 @@
 import environ
 from django.conf import settings
-from care_state_hmis.apps import PLUGIN_NAME
 from rest_framework.settings import perform_import
+
+from appointment_invoice_payment.apps import PLUGIN_NAME
 
 env = environ.Env()
 
@@ -60,10 +61,9 @@ class PluginSettings:  # pragma: no cover
     @property
     def user_settings(self) -> dict:
         if not hasattr(self, "_user_settings"):
-            self._user_settings = getattr(settings, "PLUGIN_CONFIGS", {}).get(
-                self.plugin_name, {}
-            )
+            self._user_settings = getattr(settings, "PLUGIN_CONFIGS", {}).get(self.plugin_name, {})
         return self._user_settings
+
 
 REQUIRED_SETTINGS = {}
 
@@ -71,6 +71,4 @@ DEFAULTS = {
     "HMIS_INVOICE_ALLOW_REVISIT_ACROSS_DEPARTMENTS": True,
 }
 
-plugin_settings = PluginSettings(
-    PLUGIN_NAME, defaults=DEFAULTS, required_settings=REQUIRED_SETTINGS
-)
+plugin_settings = PluginSettings(PLUGIN_NAME, defaults=DEFAULTS, required_settings=REQUIRED_SETTINGS)
