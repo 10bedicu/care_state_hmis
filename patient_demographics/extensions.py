@@ -22,7 +22,7 @@ class PatientDemographicsExtension(PlugExtension):
             "religion": {
                 "type": "string",
                 "title": "Religion",
-                "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Other"],
+                "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", *plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_OPTIONS, "Other"],
             },
         },
         **({"required": ["religion"]} if plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_REQUIRED else {}),
@@ -45,7 +45,7 @@ class PatientDemographicsExtension(PlugExtension):
                 "x-ui": {"render_blacklist": ["treatment_summary", "appointment_print"]},
                 "type": "string",
                 "title": "Religion",
-                "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Other"],
+                "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", *plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_OPTIONS, "Other"],
             },
         },
         "additionalProperties": "false",
