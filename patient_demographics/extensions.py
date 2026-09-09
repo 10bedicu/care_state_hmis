@@ -25,7 +25,10 @@ class PatientDemographicsExtension(PlugExtension):
                 "enum": ["Hindu", "Muslim", "Christian", "Sikh", "Jain", *plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_OPTIONS, "Other"],
             },
         },
-        **({"required": ["religion"]} if plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_REQUIRED else {}),
+        "required": [
+            *(["religion"] if plugin_settings.HMIS_EXTENSIONS_PATIENT_RELIGION_REQUIRED else []),
+            *(["related_person"] if plugin_settings.HMIS_EXTENSIONS_RELATED_PERSON_REQUIRED else []),
+        ],
         "additionalProperties": "false",
     }
     retrieve_schema = {
