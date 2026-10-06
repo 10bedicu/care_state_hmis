@@ -4,7 +4,7 @@ Care State HMIS Plugins
 
 CARE backend plugin repository for State HMIS workflows.
 
-This repository packages five backend plugins that can be installed together
+This repository packages six backend plugins that can be installed together
 from a single source repository:
 
 - ``invoice_auto_balance``: Automatically balances issued invoices when
@@ -13,10 +13,12 @@ from a single source repository:
   related person, caste, and religion.
 - ``encounter_hospital_identifier``: Assigns a hospital-facing encounter
   identifier and prevents it from being changed later.
+- ``encounter_identifiers``: Assigns encounter identifiers from a per-facility
+  pattern, with resettable sequences.
 - ``encounter_access_authorization``: Adds custom encounter authorization rules
   for restarting completed encounters.
-- ``appointment_invoice_payment``: Creates and settles appointment-linked
-  invoices when charge items are attached to bookings.
+- ``appointment_revisit_charge``: Applies revisit pricing to appointment
+  bookings when a patient returns within the schedule's revisit window.
 
 Included Plugins
 ================
@@ -43,6 +45,14 @@ Assigns ``Encounter.external_identifier`` automatically using the encounter
 creation date and database id in the format ``YYMM########``. Once assigned,
 the plugin blocks later edits to that identifier.
 
+``encounter_identifiers``
+-------------------------
+
+The configurable alternative to ``encounter_hospital_identifier``. Each
+facility defines its own identifier pattern, along with the encounter classes
+it applies to and how often the sequence resets. Enable one of the two
+identifier plugins, not both.
+
 ``encounter_access_authorization``
 ----------------------------------
 
@@ -50,12 +60,12 @@ Overrides encounter authorization handling to support custom restart rules.
 Superusers can restart a completed encounter, and the user who last updated the
 encounter can do the same when they still hold encounter write permission.
 
-``appointment_invoice_payment``
--------------------------------
+``appointment_revisit_charge``
+------------------------------
 
-Automates billing for appointment bookings after a charge item is attached. The
-plugin can apply revisit pricing, issue an invoice, and create a corresponding
-payment reconciliation for the booking.
+Replaces the default appointment charge item with the schedule's revisit charge
+item when the patient has a paid booking inside the revisit window. The lookup
+can span departments within a facility or stay on a single schedule resource.
 
 Local Development
 =================
@@ -98,13 +108,19 @@ configuration and install the repository in editable mode.
 			  configs={},
 		  ),
 		  Plug(
+			  name="encounter_identifiers",
+			  package_name="/absolute/path/to/care_state_hmis",
+			  version="",
+			  configs={},
+		  ),
+		  Plug(
 			  name="encounter_access_authorization",
 			  package_name="/absolute/path/to/care_state_hmis",
 			  version="",
 			  configs={},
 		  ),
 		  Plug(
-			  name="appointment_invoice_payment",
+			  name="appointment_revisit_charge",
 			  package_name="/absolute/path/to/care_state_hmis",
 			  version="",
 			  configs={},
@@ -185,13 +201,19 @@ to your CARE ``plug_config.py`` using the repository URL.
 		   configs={},
 	   ),
 	   Plug(
+		   name="encounter_identifiers",
+		   package_name="git+https://github.com/10bedicu/care_state_hmis.git",
+		   version="@main",
+		   configs={},
+	   ),
+	   Plug(
 		   name="encounter_access_authorization",
 		   package_name="git+https://github.com/10bedicu/care_state_hmis.git",
 		   version="@main",
 		   configs={},
 	   ),
 	   Plug(
-		   name="appointment_invoice_payment",
+		   name="appointment_revisit_charge",
 		   package_name="git+https://github.com/10bedicu/care_state_hmis.git",
 		   version="@main",
 		   configs={},

@@ -49,8 +49,8 @@ setup(
             "encounter_hospital_identifier.*",
             "encounter_access_authorization",
             "encounter_access_authorization.*",
-            "appointment_invoice_payment",
-            "appointment_invoice_payment.*",
+            "appointment_revisit_charge",
+            "appointment_revisit_charge.*",
             "encounter_identifiers",
             "encounter_identifiers.*",
         ]
