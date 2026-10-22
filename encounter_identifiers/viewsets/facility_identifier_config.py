@@ -50,7 +50,25 @@ class FacilityEncounterIdentifierConfigViewSet(
                 "You do not have permission to configure this facility"
             )
 
+    def validate_reset_period_in_pattern(self, pattern, reset_period):
+        reset_period_tokens = {
+            "yearly": ["YYYY", "YY"],
+            "monthly": ["MM"],
+            "daily": ["DD"],
+        }
+        tokens = reset_period_tokens.get(reset_period, [])
+        if tokens and not any(token in pattern for token in tokens):
+            raise ValidationError(
+                {
+                    "reset_period": (
+                        f"Reset period '{reset_period}' requires the pattern to include "
+                        f"one of the following tokens: {', '.join(tokens)}"
+                    )
+                }
+            )
+
     def validate_data(self, instance, model_obj=None):
+        self.validate_reset_period_in_pattern(instance.pattern, instance.reset_period)
         if model_obj is not None:
             return
         facility = self.get_facility()
