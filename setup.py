@@ -53,6 +53,8 @@ setup(
             "appointment_invoice_payment.*",
             "encounter_identifiers",
             "encounter_identifiers.*",
+            "encounter_auto_complete",
+            "encounter_auto_complete.*",
         ]
     ),
     test_suite="tests",
