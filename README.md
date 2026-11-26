@@ -2,7 +2,7 @@
 
 CARE backend plugin repository for State HMIS workflows.
 
-This repository packages five backend plugins that can be installed together from a single source repository:
+This repository packages backend plugins that can be installed together from a single source repository:
 
 | Plugin | Purpose |
 | --- | --- |
@@ -11,6 +11,7 @@ This repository packages five backend plugins that can be installed together fro
 | `encounter_hospital_identifier` | Assigns a hospital-facing encounter identifier and prevents it from being changed later. |
 | `encounter_access_authorization` | Adds custom encounter authorization rules for restarting completed encounters. |
 | `appointment_invoice_payment` | Creates and settles appointment-linked invoices when charge items are attached to bookings. |
+| `encounter_auto_complete` | Completes configured encounter classes across all facilities at midnight. |
 
 ## Included Plugins
 
@@ -35,6 +36,47 @@ Overrides encounter authorization handling to support custom restart rules. Supe
 Automates billing for appointment bookings after a charge item is attached. The plugin can apply revisit pricing, issue an invoice, and create a corresponding payment reconciliation for the booking.
 
 ## Local Development
+
+### Midnight encounter completion
+
+Enable `encounter_auto_complete` as a CARE plug, using this repository as its
+`package_name`. It has no API, models, or migrations. Set the following environment
+variable on the Celery workers:
+
+```env
+ENCOUNTER_AUTO_COMPLETE_CLASSES=amb,vr
+```
+
+Allowed classes are `imp`, `amb`, `obsenc`, `emer`, `vr`, and `hh`. Whitespace and
+duplicate entries are ignored. An absent or empty value disables completion;
+invalid classes fail startup validation. Restart workers after changing the value.
+
+The plug must be installed and enabled in both Beat and worker processes. It uses
+the existing Celery Beat scheduler and registers one daily task at midnight in the
+Celery timezone (`Asia/Kolkata` in CARE). No scheduler replacement is needed.
+
+Each run applies across **all facilities**, including older open encounters. Only
+`in_progress`, `on_hold`, and `discharged` encounters in the selected classes are
+eligible. Creation time and any recorded period start must precede the midnight
+cutoff. Missing starts are allowed; malformed starts are skipped and logged.
+Naive start timestamps are interpreted in the Celery timezone. Planned, terminal,
+deleted, and post-cutoff encounters are excluded.
+
+Completion appends status history with an automatic source and scheduled cutoff,
+sets `updated_by` to null, fills a missing period end with the execution time, and
+uses CARE's existing device and location cleanup. Each encounter is processed in
+its own transaction with a row lock. Overlapping/repeated runs skip encounters
+already completed. Transient database failures retry up to three times, keeping
+the original cutoff; encounters committed before a failure are not changed again.
+There is no automatic catch-up for a missed Beat dispatch.
+
+To run the focused tests from a CARE checkout with the plug installed and enabled:
+
+```bash
+python manage.py test encounter_auto_complete --settings=config.settings.test
+```
+
+### Installing plugs locally
 
 To work on these plugs locally alongside CARE, use a local path-based plug configuration and install the repository in editable mode.
 
